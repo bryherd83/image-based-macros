@@ -151,6 +151,26 @@ class Room:
         return " · ".join(parts)
 
 
+def sprint_off_for_trial(env, S):
+    """Trials walk without sprint (it overshoots the enemies). Sprint is a toggle the game keeps
+    on, and only switches while moving, so: if the last dungeon saw it on, walk a step and press
+    it once. Unknown (no dungeon since the farm started): leave it, never guess."""
+    if S.get("trial_sprint", False):
+        return
+    on = getattr(env, "sprint_on", None)
+    toggle = getattr(env, "toggle_sprint", None)
+    if on is None:
+        env.log("trial: no dungeon yet to tell if sprint is on · leaving it as it is")
+        return
+    if not on or not toggle:
+        return
+    env.set_keys({"w"})
+    env.sleep(0.15)
+    toggle("trials walk without sprint")
+    env.sleep(0.1)
+    env.set_keys(set())
+
+
 def run_trial(env, mode, leave_after):
     """Returns 'done', 'dungeon' (a dungeon took over), 'stopped' (F6) or 'paused' (Roblox
     wasn't the active window)."""
@@ -185,6 +205,7 @@ def run_trial(env, mode, leave_after):
     same_wave, last_wave_done = 0, None
     covered_since = 0.0
     env.sleep(1.5)
+    sprint_off_for_trial(env, S)
     f = env.frame()
     room = spawn_and_walk(clean=f is not None and hud.dps_hitting(f) is False)
     if room:

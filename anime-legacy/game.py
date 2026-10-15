@@ -35,6 +35,7 @@ DEFAULTS = {
     "face_doors": True,                # doors only open while you look at them
     "dungeon_sprint": True,
     "sprint_key": "lctrl",
+    "trial_sprint": False,             # trials: False = turn sprint off (dungeons always sprint)
     "cam_px_per_rad": 584,             # mouse movement per radian of camera turn (learned)
     "walk_rooms_per_sec": 0.27,        # learned
     "dungeon_stuck_spawn_sec": 40,
@@ -190,7 +191,7 @@ class Game:
         self.hwnd = None
         self.rect = None
         self.held = set()
-        self.sprint_on = False
+        self.sprint_on = None            # sprint: True/False once a dungeon has checked, None = unknown
         self.zoom_hover = None
         self.info = {}
         self.last_rect_check = 0.0
@@ -408,7 +409,8 @@ class Game:
         if not self.active():
             return False
         winio.tap(self.S.get("sprint_key", "lctrl"), 60)
-        self.sprint_on = not self.sprint_on
+        if self.sprint_on is not None:
+            self.sprint_on = not self.sprint_on
         self.log(f"sprint key pressed{' · ' + why if why else ''}")
         time.sleep(0.12)
         return True

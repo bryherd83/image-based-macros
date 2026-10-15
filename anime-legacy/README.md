@@ -23,7 +23,8 @@ stuck (no new room for 2 minutes) when the Trial pops up, it leaves for the Tria
 - **Auto-reconnect:** reads Roblox's own log. After a real disconnect or a crash it warns you
   for 30 s, then closes Roblox and opens Anime Legacy again. Normal teleports never trigger it.
   At most 6 times an hour.
-- **Sprint always on:** checks your walking speed on the minimap and presses sprint if it's off.
+- **Sprint:** on in dungeons (checks your walking speed on the minimap and presses sprint if it's
+  off), turned off for trials, where sprinting overshoots the enemies.
 - **Monitor off:** keeps working with the monitor switched off, using a slower screen-copy
   fallback.
 - **Trait-roll screens:** waits through the black full-screen "MYTHICAL TRAIT" animation
@@ -67,6 +68,7 @@ you may want to change:
 | `trial_leave_after` | `21` | Leave the trial after this wave |
 | `skill_key` | `""` | A key to press every 1.5 s during runs, such as `"z"` |
 | `sprint_key` | `lctrl` | The game's sprint toggle |
+| `trial_sprint` | `false` | Sprint during trials too |
 | `dungeon_leave_for_trial_sec` | `120` | Leave a stuck dungeon for the Trial after this long without a new room |
 | `auto_reconnect` | `true` | Reopen the game after a disconnect or crash |
 | `clips` | `true` | Save NVIDIA Instant Replay clips when something goes wrong |

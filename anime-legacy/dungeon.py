@@ -914,6 +914,7 @@ class DungeonRun:
                 self.sprint_pause = now + 120
             elif med >= 0.78 * ref:
                 self.sprint_taps.clear()
+            e.sprint_on = True                   # (trials use this to turn it off)
             return
         if med >= 0.82 * ref:
             # sprinting: keep the sprint speed up to date (the walking-speed estimate can't be
@@ -921,6 +922,7 @@ class DungeonRun:
             # clearly-sprinting stretches, so it can't drift down to plain walking speed.
             if med >= 0.92 * ref:
                 self.sprint_ref = med if med > 1.25 * ref else 0.9 * ref + 0.1 * med
+            e.sprint_on = True
             return
         self.sprint_taps = [t for t in self.sprint_taps if now - t < 120]
         if len(self.sprint_taps) >= 3:
@@ -928,6 +930,7 @@ class DungeonRun:
             self.env.log("walking stays slow after 3 sprint presses · leaving sprint alone for 2 minutes")
             return
         toggle = getattr(e, "toggle_sprint", None)
+        e.sprint_on = False                      # (the press below turns it on)
         if toggle and toggle(f"walking at {med / ref:.0%} of sprint speed, so sprint was off"):
             self.sprint_taps.append(now)
             self.sprint_check = med
