@@ -1,0 +1,21 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Per-user files each macro writes while it runs (learned values, your choices)
+settings.json
+settings.json.bad-*
+
+# Screenshots kept for offline tests, logs, recordings
+testdata/
+logs/
+*.log
+*.mp4
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
