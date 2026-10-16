@@ -69,7 +69,19 @@ def press_spawn(env):
         if attempt < 2:
             env.sleep(0.25)
     else:
-        return None
+        # the picture didn't match. The button never moves, so click where it was last seen and
+        # count it only if the view really changed (you were moved)
+        why = getattr(env, "spawn_why", None)
+        env.spawn_note = why() if why else ""
+        spot = getattr(env, "spawn_spot", None)
+        if not (spot and wait_moved and spot()):
+            return None
+        env.status("trial: clicked where Spawn was last seen")
+        t0 = env.now()
+        if wait_moved(before, most) is None:
+            return None
+        env.spawn_spot_ok = getattr(env, "spawn_spot_ok", 0) + 1
+        return env.now() - t0
     env.status("trial: pressed Spawn")
     t0 = env.now()
     if wait_moved:
@@ -183,16 +195,24 @@ def run_trial(env, mode, leave_after):
     env.log(f"trial started · leave after wave {leave_after} · walk-in {walk_in_sec:.1f}s, {extra_sec:.1f}s past the first hit")
     env.shot("trial-started", force=True)
 
-    no_spawn_n = 0
+    no_spawn_n = spot_n = 0
 
     def spawn_and_walk(old_txt="", clean=False):
-        nonlocal no_spawn_n
+        nonlocal no_spawn_n, spot_n
         t = env.now()
+        spot_ok = getattr(env, "spawn_spot_ok", 0)
         sp = press_spawn(env)
+        if sp is not None and getattr(env, "spawn_spot_ok", 0) > spot_ok:
+            spot_n += 1
+        if spot_n == 1 and sp is not None and getattr(env, "spawn_spot_ok", 0) > spot_ok:
+            env.log(f"trial: the Spawn picture didn't match ({getattr(env, 'spawn_note', '')})"
+                    " · clicked where it was last seen and that worked · screenshot saved")
+            env.shot("trial-spawn-mismatch", force=True)
         if sp is None:
             no_spawn_n += 1
             if no_spawn_n == 1:        # once per trial, with a picture of what covered it
-                env.log("trial: can't see the Spawn button (top of the screen) · walking instead · screenshot saved")
+                env.log(f"trial: can't see the Spawn button ({getattr(env, 'spawn_note', '')})"
+                        " · walking instead · screenshot saved")
                 env.shot("trial-no-spawn", force=True)
             return None
         walked, saw, hit_at, zero = walk_in(env, walk_in_sec, extra_sec, old_txt, clean)
@@ -422,8 +442,9 @@ def run_trial(env, mode, leave_after):
         env.status(f"trial wave {wv_t} · enemies {en_t} · {reach} · {waited:.0f}s")
         env.sleep(0.2)
     env.release_all()
-    if no_spawn_n:
-        env.log(f"trial: the Spawn button wasn't there {no_spawn_n} time(s) this trial")
+    if no_spawn_n or spot_n:
+        env.log(f"trial: Spawn picture not matched {spot_n + no_spawn_n} time(s) this trial"
+                f" · clicking its usual spot worked {spot_n}, didn't {no_spawn_n}")
     if abs(walk_in_sec - start_walk_in[0]) >= 0.05 or abs(extra_sec - start_walk_in[1]) >= 0.05:
         env.log(f"trial: walk-in now {walk_in_sec:.1f}s, {extra_sec:.1f}s past the first hit (learned from the last rooms)")
     return ended or "done"

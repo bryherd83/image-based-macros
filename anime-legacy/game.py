@@ -374,10 +374,30 @@ class Game:
         c = self.find("spawn")
         if not c:
             return False
+        self.spawn_xy = c                 # the button doesn't move: remembered for spawn_spot()
         self.release_all()
         self.click(*c)
         self.sleep(wait)
         return True
+
+    def spawn_spot(self):
+        """Clicks where the Spawn button was last seen, for when the picture of it doesn't match
+        (laptop trials, 10-15). trial.py checks afterwards that you were really moved.
+        Returns False if it has never been seen."""
+        c = getattr(self, "spawn_xy", None)
+        if not c:
+            return False
+        self.release_all()
+        self.click(*c)
+        return True
+
+    def spawn_why(self):
+        """Why the Spawn picture wasn't found, for the log: how well the best spot matched."""
+        f = self.frame()
+        if f is None:
+            return "no picture from the screen"
+        frac, c = self.tpl.match(f, "spawn")
+        return f"best match {frac:.0%} at {c} (needs 97%), screen {f.shape[1]}x{f.shape[0]}"
 
     def wait_moved(self, before, most=2.5, least=0.2):
         """After Spawn: waits until the middle of the screen has changed from `before` (you were

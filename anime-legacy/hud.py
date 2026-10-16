@@ -46,9 +46,15 @@ class Templates:
 
     def find(self, frame: np.ndarray, name: str, region=None, tol=None, min_frac=0.97):
         """Centre (x, y) of the picture inside frame, or None."""
+        frac, c = self.match(frame, name, region, tol)
+        return c if c is not None and frac >= min_frac else None
+
+    def match(self, frame: np.ndarray, name: str, region=None, tol=None):
+        """(share of pixels that match, centre (x, y)) of the best spot for the picture, or
+        (0.0, None). find() needs a share of 0.97."""
         tpl = self.img.get(name)
-        if tpl is None:
-            return None
+        if tpl is None or frame is None:
+            return 0.0, None
         H, W = frame.shape[:2]
         reg, t0 = REGIONS[name]
         if region is not None:
@@ -59,15 +65,13 @@ class Templates:
         sub = frame[y1:y2, x1:x2]
         th, tw = tpl.shape[:2]
         if sub.shape[0] < th or sub.shape[1] < tw:
-            return None
+            return 0.0, None
         res = cv2.matchTemplate(sub, tpl, cv2.TM_SQDIFF)
         _, _, loc, _ = cv2.minMaxLoc(res)
         fx, fy = loc
         patch = sub[fy:fy + th, fx:fx + tw].astype(np.int16)
         diff = np.abs(patch - tpl.astype(np.int16)).max(axis=2)
-        if (diff <= tol).mean() < min_frac:
-            return None
-        return x1 + fx + tw // 2, y1 + fy + th // 2
+        return float((diff <= tol).mean()), (x1 + fx + tw // 2, y1 + fy + th // 2)
 
     def size(self, name):
         th, tw = self.img[name].shape[:2]

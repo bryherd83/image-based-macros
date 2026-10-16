@@ -44,3 +44,40 @@ for scene in ["near the side walls", "spread over the room"]:
     ok = ok and all(s.left for s in sims)
 assert ok, "stalled or pressed Spawn too often"
 print("no-spawn: ok")
+
+
+class MismatchSim(t.TrialSim):
+    """Laptop 10-15: the Spawn picture matches at the start of the trial, then stops matching
+    although the button is still there. Clicking where it was seen works."""
+    def press_spawn(self, wait=1.0):
+        if getattr(self, "spawn_xy", None):
+            self.sleep(wait)
+            return False
+        self.spawn_xy = (1080, 122)
+        return super().press_spawn(wait)
+
+    def spawn_spot(self):
+        if not getattr(self, "spawn_xy", None):
+            return False
+        t.TrialSim.press_spawn(self, 0)
+        self.spots = getattr(self, "spots", 0) + 1
+        return True
+
+    def spawn_why(self):
+        return "best match 80%"
+
+
+before = [t.run(t.trial_new, "deep (like your 19:47 trial)", s) for s in range(6)]
+after = []
+for s in range(6):
+    sim = MismatchSim("deep (like your 19:47 trial)", s)
+    t.trial_new.run_trial(sim, "dungeon", sim.leave_after)
+    after.append(sim)
+    assert sim.left, "didn't reach the leave wave"
+    assert sum("didn't match" in m for _, m in sim.lines) == 1, "the mismatch line should be logged once"
+    assert not any("can't see the Spawn" in m for _, m in sim.lines)
+mean = lambda sims: sum(x for s in sims for x in s.clear_times) / sum(len(s.clear_times) for s in sims)
+print(f"Spawn picture stops matching: 6/6 reached wave 22 · {mean(after):.1f} s/room"
+      f" (normal {mean(before):.1f}) · clicked the usual spot {sum(s.spots for s in after)}x")
+assert mean(after) < mean(before) * 1.3, "clicking the usual spot should be about as fast as normal"
+print("spawn mismatch: ok")
