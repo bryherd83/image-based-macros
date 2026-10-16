@@ -286,7 +286,22 @@ def covered(frame) -> bool:
 
 
 def has_minimap(frame) -> bool:
-    return mm.has_minimap(minimap_crop(frame, 80), minimap_buttons_strip(frame))
+    return mm.has_minimap(minimap_crop(frame, 80), minimap_buttons_strip(frame)) and compass_letters(frame)
+
+
+def compass_letters(frame) -> bool:
+    """The white N and S letters on the minimap's ring. A dark scene with gold text top-right
+    (another player's "Mythical · Lvl. 45" title) passed the disc + gold-button check twice in
+    laptop trials (10-16), and the trial broke off as a 'dungeon'. On 842 real minimap frames
+    N/S are 16-33% white pixels; on those two, 0%."""
+    sx, sy = map_scale(frame)
+    R = round(11 * sy)
+    for y in (50, 274):
+        X, Y = round(mm.MAP_CX * sx), round(y * sy)
+        box = frame[max(0, Y - R):Y + R, max(0, X - R):X + R]
+        if box.size == 0 or (box.min(axis=2) > 190).mean() < 0.05:
+            return False
+    return True
 
 
 def minimap_buttons(frame):

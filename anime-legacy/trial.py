@@ -247,6 +247,7 @@ def run_trial(env, mode, leave_after):
     settle_sec = float(S.get("trial_dps_settle_sec", 2.0))
     meter_clean = False           # the DPS meter has read 0 since this room was cleared
     same_wave, last_wave_done = 0, None
+    unreached_since = None        # first Spawn retry in the room being fought (None = none yet)
     covered_since = 0.0
     env.sleep(1.5)
     sprint_off_for_trial(env, S)
@@ -334,6 +335,24 @@ def run_trial(env, mode, leave_after):
                 and now - last_spawn > respawn:
             env.log(f"trial: nothing hit for {now - last_hit if last_hit else quiet:.0f}s"
                     f" ({waited:.0f}s in this room) · pressing Spawn")
+            if unreached_since is None:
+                unreached_since = now
+            elif room.retries == 1:
+                env.shot("trial-unreachable", force=True)     # second retry: a picture of why
+            # still nothing after trial_give_up_sec of retries (laptop 10-16 09:18: 12 minutes of
+            # Spawn retries in wave 21 until the dungeon popup came): leave with what's been won
+            give_up = float(S.get("trial_give_up_sec", 180))
+            if give_up > 0 and now - unreached_since > give_up:
+                c = env.find("leave", f)
+                if c:
+                    env.release_all()
+                    env.log(f"trial: couldn't reach the enemies in wave {wv_t} for {now - unreached_since:.0f}s"
+                            " · leaving the trial")
+                    env.shot("trial-gave-up", force=True)
+                    env.click(*c)
+                    env.sleep(3)
+                    ended = "gave up"
+                    break
             clip = getattr(env, "clip", None)
             if clip:
                 clip("trial: couldn't reach the enemies")
@@ -454,6 +473,7 @@ def run_trial(env, mode, leave_after):
                 room = Room(env, S, saw=saw_new)
             progress_at = env.now()
             clear_since = 0.0
+            unreached_since = None
             continue
         reach = "hitting" if hitting else "nothing in reach" if hitting is False else "DPS unreadable"
         env.status(f"trial wave {wv_t} · enemies {en_t} · {reach} · {waited:.0f}s")

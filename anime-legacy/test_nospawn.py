@@ -81,3 +81,21 @@ print(f"Spawn picture stops matching: 6/6 reached wave 22 · {mean(after):.1f} s
       f" (normal {mean(before):.1f}) · clicked the usual spot {sum(s.spots for s in after)}x")
 assert mean(after) < mean(before) * 1.3, "clicking the usual spot should be about as fast as normal"
 print("spawn mismatch: ok")
+
+
+class UnreachableSim(t.TrialSim):
+    """Laptop 10-16 09:18: in wave 21 one enemy can't be reached from anywhere (12 minutes of
+    Spawn retries). It must leave the trial after trial_give_up_sec, not stay forever."""
+    def _room(self):
+        super()._room()
+        if self.wave == 5:
+            self.en[0][:2] = [5.0, 5.0]       # far outside the room
+
+
+sim = UnreachableSim("deep (like your 19:47 trial)", 1, limit=25 * 60)
+res = t.trial_new.run_trial(sim, "dungeon", sim.leave_after)
+gave = [(tm, m) for tm, m in sim.lines if "leaving the trial" in m]
+print("unreachable enemy:", res, gave[:1], f"at {sim.t:.0f}s")
+assert res == "gave up" and gave and sim.wave == 5
+assert 180 < gave[0][0] - min(tm for tm, m in sim.lines if "pressing Spawn" in m) < 200
+print("give up: ok")
