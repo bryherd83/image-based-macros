@@ -326,7 +326,7 @@ def run_trial(env, mode, leave_after):
             if seen != last_seen:
                 last_seen, progress_at = seen, now
         quiet = now - max(progress_at, last_hit)
-        respawn = float(S.get("trial_respawn_sec", 20))
+        respawn = float(S.get("trial_respawn_sec", 10))
         # and a hard limit per room, whatever the counters say: this long in a room with
         # nothing hit for 20 s = Spawn and walk in again
         stuck_room = waited > float(S.get("trial_room_max_sec", 90)) and now - last_hit > respawn

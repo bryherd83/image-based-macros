@@ -51,7 +51,7 @@ DEFAULTS = {
     "trial_far_sec": 3.5,              # how far in the step-in goes (seconds of W from the door)
     "trial_spawn_wait_sec": 2.5,       # longest wait for Spawn to move you
     "trial_dps_settle_sec": 2.0,       # longest extra wait for the DPS meter to drop to 0 after a room
-    "trial_respawn_sec": 20,           # walked all the way in, nothing hit this long: Spawn again
+    "trial_respawn_sec": 10,           # walked all the way in, nothing hit this long: Spawn again
     "trial_step_ms": 300,              # one step further in = W held this long
     "trial_max_steps": 8,
     "trial_side_ms": 750,              # sideways move between zigzag lanes (~0.2 of a room)
@@ -63,12 +63,22 @@ DEFAULTS = {
 }
 
 
+# defaults that changed after settings.json was written: a saved value still equal to the old
+# default (never changed by hand) takes the new one
+CHANGED_DEFAULTS = {
+    "trial_respawn_sec": (20, 10),     # 10-16: stood 20 s doing nothing at the far end of a room
+}
+
+
 def load_settings():
     s = dict(DEFAULTS)
     if os.path.exists(SETTINGS_FILE):
         try:
             with open(SETTINGS_FILE, encoding="utf-8") as f:
                 s.update(json.load(f))
+            for k, (old, new) in CHANGED_DEFAULTS.items():
+                if s.get(k) == old:
+                    s[k] = new
             return s
         except (OSError, ValueError):
             # unreadable: keep a copy instead of silently overwriting what was learned

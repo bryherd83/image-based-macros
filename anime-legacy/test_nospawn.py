@@ -1,6 +1,6 @@
 """Trial where the Spawn button can't be found while stuck in a room (laptop 10-15: it logged
 "nothing hit ... pressing Spawn" every second for 2.5 minutes and stood still). Now it must
-search the room on foot (further in, then the side lanes), try Spawn at most every 20 s,
+search the room on foot (further in, then the side lanes), try Spawn at most every trial_respawn_sec,
 and still reach the leave wave (every retry here has no Spawn button: the worst case).
 
     python test_nospawn.py
@@ -33,7 +33,7 @@ for scene in ["near the side walls", "spread over the room"]:
     for s in sims:
         presses = [tm for tm, m in s.lines if "pressing Spawn" in m]
         gaps = [b - a for a, b in zip(presses, presses[1:])]
-        if gaps and min(gaps) < 19.5:
+        if gaps and min(gaps) < float(s.settings['trial_respawn_sec']) - 0.5:
             ok = False
             print(f"  seed: Spawn pressed again after {min(gaps):.1f}s")
         once = sum(1 for _, m in s.lines if "can't see the Spawn button" in m)
