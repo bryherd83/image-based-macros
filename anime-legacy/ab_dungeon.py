@@ -2,7 +2,7 @@
     python ab_dungeon.py N [key=value settings for 'now' ...]
 """
 import importlib.util, multiprocessing as mp, os, statistics, subprocess, sys
-HERE = r"C:\Users\bryhe\Downloads\anime-legacy-farmpy"
+HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import sim  # noqa
 import minimap as mm  # noqa
