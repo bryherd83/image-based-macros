@@ -6,20 +6,31 @@ import random
 
 import hud
 
-# When the popups show up, in minutes:seconds past the hour (local time). Every join in the
-# logs (Oct 13-14) was within 2 s of these: Dungeons at :01:40 and :31:40, Trials 15 minutes
-# later. Only used to tell you what's next; the farm still waits for the actual popup.
-POPUP_TIMES = {"dungeon": ((1, 40), (31, 40)), "trial": ((16, 40), (46, 40))}
+# When the popups show up: Dungeons on the hour and half hour, Trials 15 minutes later, plus a
+# few seconds. Each PC's clock is off by its own amount (the gaming PC's ran 1:44 fast: popups at
+# :01:40 by its clock, the laptop's at :00:02), so the seconds past the quarter hour are learned
+# from the real joins (setting popup_offset_sec). Used to tell you what's next, and to watch for
+# a popup that never came; the farm still waits for the actual popup.
+POPUP_TIMES = {"dungeon": (0, 30), "trial": (15, 45)}
+DEFAULT_OFFSET = 100          # the gaming PC's clock, Oct 13-15
 
 
-def next_popup(kinds, now=None):
+def popup_offset(when):
+    """Seconds past the quarter hour of a popup seen at `when`, or None if too far from one."""
+    sec = (when.minute % 15) * 60 + when.second
+    return sec if sec < 300 else None
+
+
+def next_popup(kinds, now=None, offset=DEFAULT_OFFSET):
     """(kind, time) of the next Dungeon / Trial popup going by the usual times."""
     now = now or dt.datetime.now()
     best = None
     for kind in kinds:
-        for m, s in POPUP_TIMES[kind]:
-            t = now.replace(minute=m, second=s, microsecond=0)
-            if t <= now:
+        for m in POPUP_TIMES[kind]:
+            t = now.replace(minute=m, second=0, microsecond=0) + dt.timedelta(seconds=offset)
+            while t > now + dt.timedelta(hours=1):
+                t -= dt.timedelta(hours=1)
+            while t <= now:
                 t += dt.timedelta(hours=1)
             if best is None or t < best[1]:
                 best = (kind, t)
@@ -64,7 +75,8 @@ class Culling:
         if c:
             e.close_menu(*c)
             return
-        kind, t = next_popup(("dungeon", "trial") if e.settings.get("join_trials") else ("dungeon",))
+        kind, t = next_popup(("dungeon", "trial") if e.settings.get("join_trials") else ("dungeon",),
+                             offset=float(e.settings.get("popup_offset_sec", DEFAULT_OFFSET)))
         left = max(0, int((t - dt.datetime.now()).total_seconds()))
         e.status(f"waiting · next: {kind} popup at {t:%H:%M:%S} (in {left // 60}:{left % 60:02d})")
         self.anti_afk()

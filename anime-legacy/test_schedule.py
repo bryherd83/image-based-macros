@@ -11,7 +11,7 @@ import statistics
 
 import minimap as mm
 import sim
-from culling import next_popup
+from culling import next_popup, popup_offset
 from dungeon import DungeonRun
 from hud import Popup
 
@@ -39,6 +39,12 @@ if __name__ == "__main__":
     assert next_popup(both, D(2026, 10, 14, 20, 50)) == ("dungeon", D(2026, 10, 14, 21, 1, 40))
     assert next_popup(("dungeon",), D(2026, 10, 14, 20, 5)) == ("dungeon", D(2026, 10, 14, 20, 31, 40))
     assert next_popup(both, D(2026, 10, 14, 23, 50)) == ("dungeon", D(2026, 10, 15, 0, 1, 40))
+    # the laptop's clock: popups 2 s past the quarter hour
+    assert next_popup(both, D(2026, 10, 15, 22, 50), offset=2) == ("dungeon", D(2026, 10, 15, 23, 0, 2))
+    assert next_popup(both, D(2026, 10, 15, 23, 0, 1), offset=2) == ("dungeon", D(2026, 10, 15, 23, 0, 2))
+    assert next_popup(both, D(2026, 10, 15, 23, 0, 30), offset=2) == ("trial", D(2026, 10, 15, 23, 15, 2))
+    assert popup_offset(D(2026, 10, 15, 23, 15, 1)) == 1 and popup_offset(D(2026, 10, 15, 23, 1, 40)) == 100
+    assert popup_offset(D(2026, 10, 15, 23, 10, 0)) is None
     print("next popup clock: ok")
 
     seeds = range(101, 109)

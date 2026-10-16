@@ -10,6 +10,7 @@ Run it with run.bat (or: .venv\\Scripts\\python.exe farm.py).
 from __future__ import annotations
 
 import ctypes
+import datetime as dt
 import ctypes.wintypes as wt
 import math
 import queue
@@ -22,7 +23,7 @@ from tkinter import ttk
 import hud
 import minimap as mm
 import winio
-from culling import Culling
+from culling import DEFAULT_OFFSET, Culling, next_popup, popup_offset
 from dungeon import DungeonRun
 from game import Game, load_settings, save_settings
 from reconnect import Watchdog
@@ -101,6 +102,9 @@ class Farm:
         self.last_clean = 0.0
         self.watch = Watchdog(_WatchEnv(self), self.S)
         self.last_watch = self.last_seen_check = 0.0
+        self.last_join = None             # wall clock of the last popup joined
+        self.popup_shot = 0.0
+        self.popup_missed = None          # the due time already reported as missed
         self.last_game_seen = time.monotonic()
 
     def start(self):
@@ -139,6 +143,30 @@ class Farm:
                 time.sleep(0.25)
         finally:
             g.release_all()                 # (sprint stays as it is: it is meant to stay on)
+
+    def popup_watch(self, g, mode):
+        """Around the time a popup is due (and nothing joined): a screenshot every 10 s, and a
+        log line if none was joined within a minute - so a missed popup leaves evidence
+        (laptop 10-15: no 23:00 dungeon, nothing in the log to say why)."""
+        S = self.S
+        kinds = (("dungeon",) if mode != "culling" else ()) + (("trial",) if S["join_trials"] else ())
+        if not kinds:
+            return
+        now = dt.datetime.now()
+        off = float(S.get("popup_offset_sec", DEFAULT_OFFSET))
+        kind, due = next_popup(kinds, now - dt.timedelta(seconds=75), off)
+        since = (now - due).total_seconds()
+        if not 0 <= since <= 70:
+            return
+        if self.last_join and abs((self.last_join - due).total_seconds()) < 60:
+            return                              # joined it
+        if 15 <= since < 60 and time.monotonic() - self.popup_shot >= 10:   # joins take 1-4 s
+            self.popup_shot = time.monotonic()
+            g.shot(f"{kind}-popup-due", force=True)
+        elif since >= 60 and self.popup_missed != due:
+            self.popup_missed = due
+            g.log(f"the {kind} popup due at {due:%H:%M:%S} didn't show up (or wasn't recognised)"
+                  f" · screenshots '{kind}-popup-due' saved")
 
     def tick(self, g: Game, culling: Culling):
         S = self.S
@@ -188,8 +216,19 @@ class Farm:
                 g.status(f"joining the {pop.kind}")
                 g.log(f"joining the {pop.kind}")
                 g.shot(f"joining-{pop.kind}", force=True)
+                self.last_join = dt.datetime.now()
+                off = popup_offset(self.last_join)
+                if off is not None:                 # learn this PC's clock (see culling.py)
+                    # a popup can be joined late (still busy), never early: a lower value counts
+                    # at once, a higher one only when two joins in a row agree
+                    cur = float(S.get("popup_offset_sec", DEFAULT_OFFSET))
+                    cand = getattr(self, "_off_cand", None)
+                    if off < cur or (cand is not None and abs(off - cand) <= 5):
+                        g.save_setting("popup_offset_sec", off, quiet=True)
+                    self._off_cand = off
                 time.sleep(1.0)
                 return
+        self.popup_watch(g, mode)
         # ---- in a dungeon or a trial?
         if (mode != "culling" or S["join_trials"]) and g.find("roomhud", f):
             is_dungeon = hud.has_minimap(f)
