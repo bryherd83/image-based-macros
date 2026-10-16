@@ -195,7 +195,7 @@ def run_trial(env, mode, leave_after):
     clear_since = 0.0
     last_pop = last_map = 0.0
     last_spawn = 0.0
-    last_count = ""
+    last_seen = None               # (enemies killed, enemies, wave) last read clearly
     last_hit = 0.0
     finals, extras = [], []       # last rooms: how far in everything died / how far past the first hit
     ended = None
@@ -273,14 +273,23 @@ def run_trial(env, mode, leave_after):
             env.tap(skill)
             env._last_skill = now
         waited = now - room.start
-        if en_t + wv_t != last_count:
-            last_count, progress_at = en_t + wv_t, now
-        # nothing dying and nothing being hit: once it has walked all the way in, trial_respawn_sec
-        # (20 s) of that = in the wrong place (3 minutes at most anyway): Spawn and walk in again
+        # progress = a real change in what the counters say. A counter that can't be read for a
+        # moment ("?", e.g. a bright effect behind it) is not progress: counting it as progress
+        # kept resetting the "nothing happening" timer, so the trial stood still for minutes
+        # (no step further in, no Spawn) - "nothing in reach · 172s".
+        if en is not None and wv is not None:
+            seen = (en.a, en.b, wv.a)
+            if seen != last_seen:
+                last_seen, progress_at = seen, now
         quiet = now - max(progress_at, last_hit)
         respawn = float(S.get("trial_respawn_sec", 20))
-        if ((room.steps >= len(room.plan) and quiet > respawn) or quiet > 180) and now - last_spawn > respawn:
-            env.log(f"trial: nothing hit for {quiet:.0f}s after walking all the way in · pressing Spawn")
+        # and a hard limit per room, whatever the counters say: this long in a room with
+        # nothing hit for 20 s = Spawn and walk in again
+        stuck_room = waited > float(S.get("trial_room_max_sec", 90)) and now - last_hit > respawn
+        if ((room.steps >= len(room.plan) and quiet > respawn) or quiet > 180 or stuck_room) \
+                and now - last_spawn > respawn:
+            env.log(f"trial: nothing hit for {now - last_hit if last_hit else quiet:.0f}s"
+                    f" ({waited:.0f}s in this room) · pressing Spawn")
             clip = getattr(env, "clip", None)
             if clip:
                 clip("trial: couldn't reach the enemies")
