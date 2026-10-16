@@ -21,6 +21,7 @@ import tkinter as tk
 from tkinter import ttk
 
 import hud
+import logsend
 import minimap as mm
 import winio
 from culling import DEFAULT_OFFSET, Culling, next_popup, popup_offset
@@ -380,6 +381,7 @@ class App:
         self.toast_until = 0.0
         self.show_box = True
         self.farm = Farm(self)
+        logsend.start(self.S, self.farm.game.logger.dir)   # to the log receiver on another PC, if any
         self._build_box()
         self._build_settings()
         threading.Thread(target=hotkey_thread, args=(self.q,), daemon=True).start()

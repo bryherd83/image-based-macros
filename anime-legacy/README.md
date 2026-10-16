@@ -33,6 +33,18 @@ stuck (no new room for 2 minutes) when the Trial pops up, it leaves for the Tria
   when something goes wrong.
 - **Log:** `Pictures\Screenshots\anime-legacy-log\log-py.txt`, plus screenshots of anything
   unusual. Screenshots older than 24 h are deleted.
+- **Logs from several PCs in one place (optional):** run `log_receiver.py` on one PC (see
+  below). The farm on your other PCs finds it on your home network and sends it their log and
+  problem screenshots about once a minute.
+
+### Collecting the logs of all your PCs on one of them
+On the PC that should collect them, start `.venv\Scripts\pythonw.exe log_receiver.py`. Windows
+Firewall has to allow ports 9120 (UDP) and 9121 (TCP) from your home network. The logs land in
+`Pictures\Screenshots\anime-legacy-log\from-<PC name>\`.
+
+The farm only ever talks to your local network, never the internet. About every 5 minutes it asks
+"is a log receiver here?" until one answers, and it sends nothing if none does. To switch this
+off, set `"log_send": false` in `settings.json`.
 
 ## Setup
 
@@ -72,6 +84,7 @@ you may want to change:
 | `dungeon_leave_for_trial_sec` | `120` | Leave a stuck dungeon for the Trial after this long without a new room |
 | `auto_reconnect` | `true` | Reopen the game after a disconnect or crash |
 | `clips` | `true` | Save NVIDIA Instant Replay clips when something goes wrong |
+| `log_send` | `true` | Send the log to a `log_receiver.py` on your home network, if there is one |
 
 ## Files
 
@@ -85,6 +98,7 @@ you may want to change:
 | `trial.py` | Trial rooms |
 | `culling.py` | Culling Game and the popup schedule |
 | `reconnect.py` | Disconnect detection and rejoin |
+| `logsend.py` / `log_receiver.py` | Sending the log to another PC on your home network |
 | `sim.py`, `sweep.py`, `test_*.py` | Simulators and offline tests |
 
 ## Tests
