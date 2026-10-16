@@ -1,5 +1,5 @@
 """A popup that never comes leaves screenshots + one log line; a joined one leaves nothing. python test_popupwatch.py"""
-import sys, datetime as dt; sys.path.insert(0, r"C:\Users\bryhe\Downloads\anime-legacy-farmpy")
+import os, sys, datetime as dt; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import farm, time
 class G:
     def __init__(s): s.shots, s.logs = [], []
