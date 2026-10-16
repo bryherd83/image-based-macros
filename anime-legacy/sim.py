@@ -26,7 +26,7 @@ LEVELS = [10, 14, 17, 21, 24, 28, 32, 34, 38, 41, 45, 48, 52, 57, 60]
 class SimEnv:
     def __init__(self, seed=1, n_rooms=50, door_w=0.14, look_doors=True, k_true=650.0, k_guess=584.0,
                  drag_fail=0.0, speed=0.27, sprint=1.5, verbose=False, time_limit=25 * 60,
-                 arrow_follows="character", noise_px=0.35, sprint_on=True):
+                 arrow_follows="character", noise_px=0.35, sprint_on=True, treasure_far=2, fog=True):
         self.rng = random.Random(seed)
         self.t = 0.0
         self.verbose = verbose
@@ -46,6 +46,12 @@ class SimEnv:
                          "walk_rooms_per_sec": speed * sprint}   # learned while sprinting
         self.saved = {}
         self.build(n_rooms)
+        # fog: the map only shows rooms you've been in and the ones next to them (live: the
+        # first look at the whole map shows 2 rooms; more appear as you go)
+        self.fog = fog
+        self.revealed = set()
+        self.visited = {(0, 0)}
+        self.reveal((0, 0))
         self.x, self.y = 0.0, 0.0
         self.cam = self.rng.uniform(-math.pi, math.pi)
         self.facing = self.cam
@@ -54,6 +60,13 @@ class SimEnv:
         self.enemies_left = 0
         self.enemy_room = None
         self.kill_t = 0
+        # enemy positions in the room being fought (offsets from its middle). Normal rooms: 4 in
+        # the middle. Treasure rooms: 5, `treasure_far` of them anywhere in the room (live: the
+        # last one or two of a treasure room are often away from the middle)
+        self.treasure_far = treasure_far
+        self.en_pos = []
+        self.en_total = 4
+        self.last_hit_t = -9.0
         self.stats = {"drags": 0, "spawns": 0, "zoom_clicks": 0, "taps": 0, "jumps": 0}
         self.cleared_order = []
         self.last_msgs = []
@@ -75,6 +88,13 @@ class SimEnv:
             rooms[b] = mm.TREASURE if self.rng.random() < 0.06 else mm.TODO
             doors.add((a, b)); doors.add((b, a))
         self.rooms, self.doors = rooms, doors
+
+    def reveal(self, c):
+        self.revealed.add(c)
+        for d in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            k = (c[0] + d[0], c[1] + d[1])
+            if (c, k) in self.doors:
+                self.revealed.add(k)
 
     def room_of(self, x, y):
         c = (round(x), round(y))
@@ -136,15 +156,30 @@ class SimEnv:
                 self.y += dy
         # enemies: a room you're in that isn't done spawns 4; your aura kills them near the middle
         c = self.room_of(self.x, self.y)
+        if c is not None and c not in self.visited:
+            self.visited.add(c)
+            self.reveal(c)
         if c is not None and self.rooms[c] in (mm.TODO, mm.TREASURE):
             if self.enemy_room != c:
-                self.enemy_room, self.enemies_left = c, 4 if self.rooms[c] == mm.TODO else 0
+                self.enemy_room = c
+                if self.rooms[c] == mm.TODO:
+                    self.en_pos = [(0.0, 0.0)] * 4
+                else:
+                    er = random.Random(c[0] * 1000 + c[1] + 7)
+                    self.en_pos = [(er.uniform(-0.06, 0.06), er.uniform(-0.06, 0.06))
+                                   for _ in range(5 - self.treasure_far)]
+                    self.en_pos += [(er.uniform(-0.3, 0.3), er.uniform(-0.3, 0.3)) for _ in range(self.treasure_far)]
+                self.enemies_left = self.en_total = len(self.en_pos)
                 self.kill_t = 0
             if self.enemies_left > 0:
-                if math.hypot(self.x - c[0], self.y - c[1]) < 0.2:
+                px, py = self.x - c[0], self.y - c[1]
+                near = [i for i, (ex, ey) in enumerate(self.en_pos) if math.hypot(px - ex, py - ey) < 0.2]
+                if near:
+                    self.last_hit_t = self.t
                     self.kill_t += dt
                     if self.kill_t > 0.9:
                         self.kill_t = 0
+                        self.en_pos.pop(near[0])
                         self.enemies_left -= 1
             if self.enemies_left == 0 and math.hypot(self.x - c[0], self.y - c[1]) < 0.3:
                 self.rooms[c] = mm.CLEARED
@@ -176,8 +211,13 @@ class SimEnv:
 
     def enemies(self):
         if self.enemy_room is not None:
-            return Counter(4 - self.enemies_left, 4, f"{4 - self.enemies_left}/4")
+            n = self.en_total
+            return Counter(n - self.enemies_left, n, f"{n - self.enemies_left}/{n}")
         return Counter(0, 0, "0/0")
+
+    def dps(self):
+        """The DPS meter: something was hit in the last half second."""
+        return self.t - self.last_hit_t < 0.5
 
     def view(self):
         self.sleep(0.006)                         # capture + parse time
@@ -192,7 +232,7 @@ class SimEnv:
         reach = mm.MAP_R / p + 0.6
         cells = {}
         for (a, b), c in self.rooms.items():
-            if math.hypot(a - self.x, b - self.y) <= reach:
+            if math.hypot(a - self.x, b - self.y) <= reach and (not self.fog or (a, b) in self.revealed):
                 cells[(a - cx, b - cy)] = c
         if (0, 0) not in cells:
             cells[(0, 0)] = mm.HIDDEN
@@ -245,6 +285,7 @@ class SimEnv:
         self.x, self.y = 0.0, 0.0
         self.enemies_left = 0
         self.enemy_room = None
+        self.en_pos = []
         return True
 
     def set_sprint(self, on):

@@ -21,6 +21,7 @@ from collections import deque
 import minimap as mm
 
 TODO_KINDS = (mm.TODO, mm.TREASURE)
+SWEEP_SPOTS = ((1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1))
 DIRS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
@@ -372,6 +373,11 @@ class DungeonRun:
         self.trial_gone = False
         self.left_for = None           # "trial" = it clicked the Trial popup and left
         self.last_popup_check = -1e9
+        # DPS meter (top left): is anything being hit? None = can't tell (old way: by the clock)
+        self.hitting = None
+        self.last_hit_t = -1e9
+        self.en_text, self.en_change_t = None, -1e9
+        self.sweep_i, self.sweep_since = 0, None
 
     # ---------------- helpers ----------------
     def say(self, msg):
@@ -470,7 +476,9 @@ class DungeonRun:
                 break
             same = same + 1 if v.s == last_s else 0
             if same >= 2:                  # clicks aren't changing the zoom: stop trying
-                self.env.log(f"minimap zoom stuck at {v.s}px rooms (clicks not registering?)")
+                # (at the end of a dungeon the map goes away mid-zoom: that's not a problem)
+                if self.env.has_minimap():
+                    self.env.log(f"minimap zoom stuck at {v.s}px rooms (clicks not registering?)")
                 break
             last_s = v.s
             self.env.zoom(-1 if v.s > hi else +1)
@@ -643,6 +651,13 @@ class DungeonRun:
         sweep_after = float(S.get("sweep_after_sec", 6))
         sweep_step = float(S.get("sweep_step_sec", 2.5))
         sweep_dist = float(S.get("sweep_dist", 0.22))
+        sweep_far = float(S.get("sweep_far", 0.25))          # how far out the round goes
+        sweep_quiet = float(S.get("sweep_quiet_sec", 1.5))   # nothing hit this long: go and look
+        sweep_dwell = float(S.get("sweep_dwell_sec", 0.6))   # at each spot, once nothing is hit
+        # a route longer than this many rooms = look at the whole map first (at most every
+        # far_scan_sec): something unfinished may be closer than the rooms remembered
+        far_scan_rooms = int(S.get("far_scan_rooms", 8))     # was 4: 5 looks per dungeon, ~5 s each
+        far_scan_sec = float(S.get("far_scan_sec", 60))
         face_doors = bool(S.get("face_doors", True))
         use_sprint = bool(S.get("dungeon_sprint", True))
         last_hud = 0.0
@@ -693,6 +708,12 @@ class DungeonRun:
                     if self.trial_check(now):
                         break
                 en = e.enemies()
+                dps = getattr(e, "dps", None)
+                self.hitting = dps() if dps else None
+                if self.hitting:
+                    self.last_hit_t = now
+                if en is not None and en.text != self.en_text:
+                    self.en_text, self.en_change_t = en.text, now
             v = self.read()
             if v is None:
                 self.stop()
@@ -729,7 +750,8 @@ class DungeonRun:
             path = self.mem.plan(now)
             # nothing unfinished known (or only far away): look at the whole map
             if not fight and ((path is None and now - self.last_scan > 15)
-                              or (path is not None and len(path) > 4 and now - self.last_scan > 60)):
+                              or (path is not None and len(path) > far_scan_rooms
+                                  and now - self.last_scan > far_scan_sec)):
                 self.scan("next room is far" if path else "no unfinished rooms known")
                 continue
             # enemies alive: doors stay shut until they're dead, so wait in this room - unless the
@@ -776,13 +798,34 @@ class DungeonRun:
                 # ---- in the room to clear: stand in the middle; if it doesn't clear, walk a square
                 if self.clear_key != cell:
                     self.clear_key, self.clear_t = cell, now
+                    self.sweep_i, self.sweep_since = 0, None
                 waited = now - self.clear_t
                 tx = ty = 0.0
                 what = (f"enemies left ({en.text})" if fight else f"clearing a {mm.NAMES.get(here, '?')} room")
-                if waited >= sweep_after:
-                    i = int((waited - sweep_after) // sweep_step) % 4
+                # nothing hit and nothing killed for a moment while enemies are left: they're out
+                # of reach, so go and look (don't stand in the middle for sweep_after first)
+                quiet = now - max(self.clear_t, self.last_hit_t, self.en_change_t)
+                out_of_reach = self.hitting is False and fight and waited >= 1.5 and quiet >= sweep_quiet
+                if self.sweep_since is None and (waited >= sweep_after or out_of_reach):
+                    self.sweep_since = self.sweep_t = now
+                if self.sweep_since is not None and self.hitting is None:
+                    # DPS meter unreadable: the four corners in turn, by the clock (as before)
+                    i = int((now - self.sweep_since) // sweep_step) % 4
                     cx_, cy_ = ((-1, -1), (1, -1), (1, 1), (-1, 1))[i]
                     tx, ty = cx_ * sweep_dist, cy_ * sweep_dist
+                    what += " · walking around the room"
+                elif self.sweep_since is not None:
+                    # all round the room; stay wherever something is being hit, move on once
+                    # nothing has been for a moment (or the spot can't be reached)
+                    cx_, cy_ = SWEEP_SPOTS[self.sweep_i % len(SWEEP_SPOTS)]
+                    tx, ty = cx_ * sweep_far, cy_ * sweep_far
+                    there = math.hypot(tx - fx, ty - fy) <= 0.06
+                    if (there and now - max(self.sweep_t, self.last_hit_t) > sweep_dwell) \
+                            or now - max(self.sweep_t, self.last_hit_t) > 3.0:
+                        self.sweep_i += 1
+                        self.sweep_t = now
+                        cx_, cy_ = SWEEP_SPOTS[self.sweep_i % len(SWEEP_SPOTS)]
+                        tx, ty = cx_ * sweep_far, cy_ * sweep_far
                     what += " · walking around the room"
                 if waited > room_timeout:
                     self.mem.skip[cell] = now + 120
@@ -798,7 +841,7 @@ class DungeonRun:
                     self.progress_ref = None
                     e.sleep(0.05)
                     continue
-                what += " · walking to the middle" if waited < sweep_after else ""
+                what += " · walking to the middle" if self.sweep_since is None else ""
             else:
                 # ---- go through the door to the next room on the route
                 self.clear_key = None

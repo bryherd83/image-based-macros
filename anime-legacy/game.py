@@ -285,6 +285,11 @@ class Game:
         img = self.map_crop(20)
         return None if img is None else mm.read_arrow(img)
 
+    def dps(self):
+        """The DPS meter (top left): True = something is being hit, False = 'DPS: 0', None = can't read."""
+        f = self.frame()
+        return hud.dps_hitting(f) if f is not None else None
+
     def enemies(self):
         f = self.frame()
         if f is None:
