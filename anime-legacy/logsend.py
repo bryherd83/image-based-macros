@@ -92,7 +92,7 @@ class Sender:
         if self.target is None:
             if time.monotonic() < self.next_look:
                 return "waiting"
-            self.next_look = time.monotonic() + 300
+            self.next_look = time.monotonic() + 60
             self.target = find_receiver()
             if self.target is None:
                 return "no receiver"

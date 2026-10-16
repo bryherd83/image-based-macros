@@ -42,7 +42,7 @@ On the PC that should collect them, start `.venv\Scripts\pythonw.exe log_receive
 Firewall has to allow ports 9120 (UDP) and 9121 (TCP) from your home network. The logs land in
 `Pictures\Screenshots\anime-legacy-log\from-<PC name>\`.
 
-The farm only ever talks to your local network, never the internet. About every 5 minutes it asks
+The farm only ever talks to your local network, never the internet. About once a minute it asks
 "is a log receiver here?" until one answers, and it sends nothing if none does. To switch this
 off, set `"log_send": false` in `settings.json`.
 
