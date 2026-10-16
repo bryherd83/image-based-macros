@@ -433,6 +433,8 @@ class Game:
             return False
         if getattr(getattr(self, "cap", None), "_stale", False):
             return False          # monitor off: NVIDIA only records the last picture before it went off
+        if getattr(self, "_clip_misses", 0) >= 2:
+            return False          # two saves in a row made no file: no Instant Replay on this PC
         self._last_clip = now
         winio.vk_combo([int(v) for v in S.get("clip_hotkey_vk", [0x12, 0x79])])   # Alt+F10
         self.log(f"saving an Instant Replay clip ({why})")
@@ -440,17 +442,25 @@ class Game:
         return True
 
     def _clip_file(self, t0):
-        root = os.path.expandvars(r"%USERPROFILE%\Videos")
+        roots = winio.videos_folders() or [os.path.expandvars(r"%USERPROFILE%\Videos")]
         for _ in range(20):
             time.sleep(2)
-            try:
-                new = [p for p in glob.glob(os.path.join(root, "*", "*.mp4")) if os.path.getmtime(p) >= t0 - 1]
-            except OSError:
-                new = []
+            new = []
+            for root in roots:
+                try:
+                    new += [p for p in glob.glob(os.path.join(root, "*", "*.mp4")) if os.path.getmtime(p) >= t0 - 1]
+                except OSError:
+                    pass
             if new:
+                self._clip_misses = 0
                 self.log(f"clip saved: {max(new, key=os.path.getmtime)}")
                 return
-        self.log("no clip showed up in Videos within 40 s · is Instant Replay on in NVIDIA App? (save = Alt+F10)")
+        self._clip_misses = getattr(self, "_clip_misses", 0) + 1
+        if self._clip_misses >= 2:
+            self.log("no clip showed up twice in a row · no more clips until the farm is restarted"
+                     " (they need NVIDIA Instant Replay on, save = Alt+F10)")
+        else:
+            self.log("no clip showed up in Videos within 40 s · is Instant Replay on in NVIDIA App? (save = Alt+F10)")
 
     def shot(self, tag, force=False):
         self.logger.shot(self.frame(), tag, force)

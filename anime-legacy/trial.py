@@ -183,10 +183,17 @@ def run_trial(env, mode, leave_after):
     env.log(f"trial started · leave after wave {leave_after} · walk-in {walk_in_sec:.1f}s, {extra_sec:.1f}s past the first hit")
     env.shot("trial-started", force=True)
 
+    no_spawn_n = 0
+
     def spawn_and_walk(old_txt="", clean=False):
+        nonlocal no_spawn_n
         t = env.now()
         sp = press_spawn(env)
         if sp is None:
+            no_spawn_n += 1
+            if no_spawn_n == 1:        # once per trial, with a picture of what covered it
+                env.log("trial: can't see the Spawn button (top of the screen) · walking instead · screenshot saved")
+                env.shot("trial-no-spawn", force=True)
             return None
         walked, saw, hit_at, zero = walk_in(env, walk_in_sec, extra_sec, old_txt, clean)
         return Room(env, S, t, sp, walked, hit_at, zero, saw)
@@ -302,6 +309,15 @@ def run_trial(env, mode, leave_after):
                     env.log("trial: straight in didn't reach them twice · also checking the sides")
                 room = r
                 last_spawn, progress_at = r.spawned_at, env.now()
+            else:
+                # no Spawn button: pressing it again every second got nowhere (laptop 10-15,
+                # "nothing hit for 118s...157s"). Search the room on foot instead - further in,
+                # then a lane on each side - and try Spawn again in trial_respawn_sec.
+                walked, retries = room.walked, room.retries + 1
+                room = Room(env, S)
+                room.retries, room.learn = retries, False
+                room.plan = step_plan(S, walked, sides=True)
+                last_spawn = progress_at = env.now()
             continue
         if en and en.a < en.b:
             room.saw_fight = True
@@ -406,6 +422,8 @@ def run_trial(env, mode, leave_after):
         env.status(f"trial wave {wv_t} · enemies {en_t} · {reach} · {waited:.0f}s")
         env.sleep(0.2)
     env.release_all()
+    if no_spawn_n:
+        env.log(f"trial: the Spawn button wasn't there {no_spawn_n} time(s) this trial")
     if abs(walk_in_sec - start_walk_in[0]) >= 0.05 or abs(extra_sec - start_walk_in[1]) >= 0.05:
         env.log(f"trial: walk-in now {walk_in_sec:.1f}s, {extra_sec:.1f}s past the first hit (learned from the last rooms)")
     return ended or "done"

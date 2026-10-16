@@ -405,3 +405,31 @@ def right_drag(px: int, chunk: int = 20, step_ms: float = 8):
 
 def jitter(a, b):
     return random.uniform(a, b)
+
+
+def videos_folders():
+    """Where Windows keeps Videos (NVIDIA saves clips in a game-named folder inside it). On PCs
+    with OneDrive folder backup that's the Videos folder inside OneDrive, not the one in the
+    user folder."""
+    out = []
+    try:
+        class GUID(ctypes.Structure):
+            _fields_ = [("a", wt.DWORD), ("b", wt.WORD), ("c", wt.WORD), ("d", ctypes.c_ubyte * 8)]
+        g = GUID(0x18989B1D, 0x99B5, 0x455B, (ctypes.c_ubyte * 8)(0x84, 0x1C, 0xAB, 0x7C, 0x74, 0xE4, 0xDD, 0xFC))
+        p = ctypes.c_wchar_p()
+        if ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(g), 0, None, ctypes.byref(p)) == 0:
+            out.append(p.value)
+            ctypes.windll.ole32.CoTaskMemFree(p)
+    except Exception:
+        pass
+    import os
+    for root in (os.environ.get("USERPROFILE"), os.environ.get("OneDrive")):
+        if root:
+            out.append(os.path.join(root, "Videos"))
+    seen, res = set(), []
+    for p in out:
+        k = os.path.normcase(os.path.abspath(p))
+        if k not in seen and os.path.isdir(p):
+            seen.add(k)
+            res.append(p)
+    return res
