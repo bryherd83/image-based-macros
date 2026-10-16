@@ -294,3 +294,20 @@ def minimap_buttons(frame):
     sx, sy = map_scale(frame)
     return ((round(mm.MAP_MINUS_X * sx), round(mm.MAP_BUTTONS_Y * sy)),
             (round(mm.MAP_PLUS_X * sx), round(mm.MAP_BUTTONS_Y * sy)))
+
+
+def black_share(img) -> float:
+    """Share of (nearly) pure black pixels."""
+    if img is None or img.size == 0:
+        return 0.0
+    return float((img.max(axis=2) < 12).mean())
+
+
+def spawn_hidden(frame, xy=(1080, 122)) -> bool:
+    """The black-squares teleport animation is over the Spawn button (laptop 10-15: its picture
+    then matched only 76%). The button itself has no black: 0% on every normal screenshot,
+    82% under the animation."""
+    if getattr(frame, "ndim", 0) != 3:
+        return False
+    x, y = xy
+    return black_share(frame[max(0, y - 20):y + 20, max(0, x - 50):x + 50]) > 0.05

@@ -56,6 +56,20 @@ def step_plan(S, walked=None, sides=False):
     return plan
 
 
+def wait_unhidden(env, most=2.0):
+    """Waits (2 s at most) while the black-squares teleport animation covers the Spawn button."""
+    hidden = getattr(hud, "spawn_hidden", None)
+    if hidden is None:
+        return
+    t0 = env.now()
+    while env.now() - t0 < most:
+        f = env.frame()
+        if f is None or not hidden(f, getattr(env, "spawn_xy", None) or (1080, 122)):
+            return
+        env.status("trial: waiting for the teleport animation to finish")
+        env.sleep(0.1)
+
+
 def press_spawn(env):
     """Presses Spawn and waits until you've been moved: the middle of the picture changes and
     then holds still (trial_spawn_wait_sec at most). Returns the seconds it waited, or None if
@@ -63,7 +77,10 @@ def press_spawn(env):
     most = float(env.settings.get("trial_spawn_wait_sec", 2.5))
     wait_moved = getattr(env, "wait_moved", None)
     before = env.frame() if wait_moved else None
+    wait_unhidden(env)
     for attempt in range(3):              # the button can be missed for a frame (screen fading)
+        if attempt:
+            wait_unhidden(env)
         if env.press_spawn(wait=0 if wait_moved else 1.0):
             break
         if attempt < 2:
