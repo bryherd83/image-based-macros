@@ -185,3 +185,48 @@ assert not g.clicks and "wave 12/50" in g.status_line
 g = farm_tick("dungeon", 10)                 # Defense started by hand in another mode: left alone
 assert not g.clicks
 print("defense leave: ok")
+
+# 5. the "Dragon Defense" window stays open after Play (PC 10-17 17:12): closed with its X
+end = cv2.imread(os.path.join(HERE, "testdata", "screens", "laptop-1017-defense-end.png"))
+
+
+class EndGame(ShotGame):
+    def __init__(self):
+        super().__init__()
+        self.settings = {"join_trials": True, "popup_offset_sec": 2}
+        self.t = 100.0
+    def find(self, name, f=None, **kw): return self.tpl.find(end, name, **kw)
+    def now(self): return self.t
+    def close_menu(self, x, y): self.clicks.append(("X", x, y))
+    def hover(self, x, y): pass
+    def tap(self, *a, **k): pass
+    def sleep(self, s): self.t += s
+
+
+real_dt = culling.dt.datetime
+
+
+class Clock(real_dt):
+    @classmethod
+    def now(cls, tz=None):
+        return real_dt(2026, 10, 17, 17, 5, 0)
+
+
+culling.dt.datetime = Clock
+try:
+    g = EndGame(); c = culling.Culling(g)
+    c.last_start = 98.0                    # Play pressed 2 s ago: give it time
+    c.defense_tick(end)
+    assert not g.clicks, g.clicks
+    g.t = 103.0                            # 5 s after Play, still open: close it
+    c.defense_tick(end)
+    print("5: play stuck ->", g.clicks, g.lines)
+    assert g.clicks == [("X", 1540, 252)] and "closed the Dragon Defense window" in g.lines[0]
+    g = EndGame(); c = culling.Culling(g)  # just left Defense at wave 10, screen open: close it at once
+    c.last_in_run = 99.0
+    c.defense_tick(end)
+    print("   after leaving ->", g.clicks)
+    assert g.clicks == [("X", 1540, 252)]
+finally:
+    culling.dt.datetime = real_dt
+print("defense screen: ok")

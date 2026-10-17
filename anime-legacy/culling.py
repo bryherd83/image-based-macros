@@ -191,17 +191,26 @@ class Culling:
                     e.status(f"Defense: {msg}")
                     return
         if just_started:
+            # the "Dragon Defense" window (Play + X) stays open after Play, over the started run
+            # (PC 10-17 17:12): close it. If Defense didn't start, the lobby shows and it's reopened
+            if now - self.last_start > float(S.get("defense_play_wait_sec", 4)) \
+                    and e.find("play", f) and e.find("close", f):
+                if now - getattr(self, "_def_close_logged", -1e9) > 600:
+                    self._def_close_logged = now
+                    e.log("Defense: closed the Dragon Defense window (it stays open after Play)")
+                e.close_menu(*e.find("close", f))
+                return
             e.status("Defense: starting...")
             return
         if due_in < float(S.get("defense_not_before_popup_sec", 60)):
             self.waiting_room(f)                  # a popup comes in a moment: just wait for it
             return
-        if self.last_in_run and now - self.last_in_run < float(S.get("after_run_wait_sec", 12)):
-            return
         c = e.find("close", f)
-        if c and not navigating:                  # a menu we didn't open: close it
-            e.release_all()
+        if c and not navigating:                  # a menu we didn't open (e.g. the Defense
+            e.release_all()                       # screen after leaving at wave 10): close it
             e.close_menu(*c)
+            return
+        if self.last_in_run and now - self.last_in_run < float(S.get("after_run_wait_sec", 12)):
             return
         self.anti_afk()
         fails = getattr(self, "def_fails", 0)
