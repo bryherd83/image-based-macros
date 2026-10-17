@@ -191,14 +191,16 @@ class Culling:
                     e.status(f"Defense: {msg}")
                     return
         if just_started:
-            # the "Dragon Defense" window (Play + X) stays open after Play, over the started run
-            # (PC 10-17 17:12): close it. If Defense didn't start, the lobby shows and it's reopened
-            if now - self.last_start > float(S.get("defense_play_wait_sec", 4)) \
-                    and e.find("play", f) and e.find("close", f):
+            # the "Dragon Defense" window, and the Teleport (Worlds) menu behind it, stay open after
+            # Play over the started run (PC 10-17 17:12 / 17:20): close every window with an X.
+            # (Play changes look once pressed, so don't wait for it.) If Defense didn't start, the
+            # lobby shows and it's reopened
+            c = e.find("close", f)
+            if now - self.last_start > float(S.get("defense_play_wait_sec", 3)) and c:
                 if now - getattr(self, "_def_close_logged", -1e9) > 600:
                     self._def_close_logged = now
-                    e.log("Defense: closed the Dragon Defense window (it stays open after Play)")
-                e.close_menu(*e.find("close", f))
+                    e.log("Defense: closing the windows left open after Play")
+                e.close_menu(*c)
                 return
             e.status("Defense: starting...")
             return

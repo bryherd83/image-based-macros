@@ -366,8 +366,29 @@ def wiggle():
         time.sleep(0.015)
 
 
-def click_screen(x: int, y: int, park=None):
-    """Roblox-proof click: glide onto the button, wiggle, press long enough to be seen."""
+def click_screen(x: int, y: int, park=None, slow=False):
+    """Roblox-proof click: glide onto the button, wiggle, press long enough to be seen.
+    slow=True for buttons that ignored a click: approach from the other side in small steps,
+    rest on the button so Roblox registers the hover, then a longer press (PC 10-17: a menu's X
+    only closed once the mouse was nudged by hand)."""
+    if slow:
+        move_to(x + 60, y - 30)
+        time.sleep(0.05)
+        glide_to(x, y, steps=20, step_ms=12)
+        time.sleep(0.25)
+        for _ in range(3):
+            mouse_rel(1, 1)
+            time.sleep(0.04)
+            mouse_rel(-1, -1)
+            time.sleep(0.04)
+        time.sleep(0.1)
+        mouse_button("left", True)
+        time.sleep(0.12)
+        mouse_button("left", False)
+        time.sleep(0.3)
+        if park:
+            move_to(*park)
+        return
     move_to(x - 40, y + 40)
     time.sleep(0.01)
     glide_to(x, y)

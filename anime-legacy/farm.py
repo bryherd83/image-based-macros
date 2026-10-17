@@ -237,6 +237,10 @@ class Farm:
                 # Dungeon / Trial popups (checked above) are clicked
                 g.release_all()
                 g.info["run"] = "defense"
+                c = g.find("close", f)
+                if c:                       # a window left open over the run (e.g. Teleport menu)
+                    g.close_menu(*c)
+                    return
                 wv = hud.read_counter(f, "wave", bx=hud.DEFENSE_WAVE_X)
                 g.info["wave"] = wv.text if wv else "?"
                 leave_at = int(S.get("defense_leave_after", 10))

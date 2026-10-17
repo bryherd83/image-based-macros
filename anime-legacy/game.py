@@ -526,13 +526,13 @@ class Game:
             winio.move_to(*self.park())
         self.zoom_hover = None
 
-    def click(self, x, y, park=True):
+    def click(self, x, y, park=True, slow=False):
         """Client coordinates."""
         if not self.active():
             return
         self.zoom_hover = None
         sx, sy = self.to_screen(x, y)
-        winio.click_screen(sx, sy, park=self.park() if park else None)
+        winio.click_screen(sx, sy, park=self.park() if park else None, slow=slow)
 
     def hover(self, x, y):
         """Puts the mouse over (x, y) so Roblox 'feels' it (menus only scroll after that)."""
@@ -548,9 +548,10 @@ class Game:
             winio.wheel(notches)
 
     def close_menu(self, x, y):
-        """Clicks a menu's X and makes sure it closed (retries if Roblox ignored the click)."""
+        """Clicks a menu's X and makes sure it closed (retries if Roblox ignored the click; the
+        retries hover slowly first, which Roblox sometimes needs before it takes a click)."""
         for i in range(4):
-            self.click(x, y)
+            self.click(x, y, slow=i > 0)
             self.sleep(0.6)
             c = self.find("close")
             if not c:

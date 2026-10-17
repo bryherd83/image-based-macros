@@ -221,7 +221,7 @@ try:
     g.t = 103.0                            # 5 s after Play, still open: close it
     c.defense_tick(end)
     print("5: play stuck ->", g.clicks, g.lines)
-    assert g.clicks == [("X", 1540, 252)] and "closed the Dragon Defense window" in g.lines[0]
+    assert g.clicks == [("X", 1540, 252)] and "closing the windows left open" in g.lines[0]
     g = EndGame(); c = culling.Culling(g)  # just left Defense at wave 10, screen open: close it at once
     c.last_in_run = 99.0
     c.defense_tick(end)
@@ -230,3 +230,17 @@ try:
 finally:
     culling.dt.datetime = real_dt
 print("defense screen: ok")
+
+# 6. the Teleport (Worlds) menu left open behind the Dragon Defense window (PC 10-17 17:20):
+#    no Play button on it, closed anyway 3 s after Play
+end = cv2.imread(os.path.join(HERE, "testdata", "screens", "pc-1017-teleport-menu-after-defense.png"))
+culling.dt.datetime = Clock
+try:
+    g = EndGame(); c = culling.Culling(g)
+    c.last_start = 96.0
+    c.defense_tick(end)
+    print("6: teleport menu ->", g.clicks)
+    assert g.clicks == [("X", 1540, 252)]
+finally:
+    culling.dt.datetime = real_dt
+print("teleport menu: ok")
