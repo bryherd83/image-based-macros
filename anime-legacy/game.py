@@ -27,7 +27,7 @@ DEFAULTS = {
     "skill_key": "",                   # e.g. "z" to press it every 1.5 s in runs ("" = never)
     "worlds_key": "t",
     "anti_afk_minutes": 10,
-    "idle_click_sec": 45,
+    "idle_click_sec": 0,               # was 45: clicking the world opened boss Drops panels
     "after_run_wait_sec": 12,
     # dungeons
     "walk_room_px": [41, 48],          # minimap zoom used while walking (room size in pixels)
@@ -67,7 +67,8 @@ DEFAULTS = {
 # defaults that changed after settings.json was written: a saved value still equal to the old
 # default (never changed by hand) takes the new one
 CHANGED_DEFAULTS = {
-    "trial_respawn_sec": (20, 10),     # 10-16: stood 20 s doing nothing at the far end of a room
+    "trial_respawn_sec": (20, 10),
+    "idle_click_sec": (45, 0),         # 10-17: idle clicks in the lobby opened a boss's Drops panel     # 10-16: stood 20 s doing nothing at the far end of a room
 }
 
 
@@ -336,6 +337,8 @@ class Game:
             return False
         if self.close_join_event(f):
             return True
+        if self.close_drops(f):
+            return True
         c = self.tpl.find(f, "close")
         if c:
             self.release_all()
@@ -554,6 +557,24 @@ class Game:
                 return True
             x, y = c
         return False
+
+    def close_drops(self, f=None):
+        """Closes a boss's "Drops" panel (pink X top right of it). The game hides the minimap and
+        counters while it's open, so the farm couldn't tell it was in a dungeon (laptop 10-17:
+        the 03:00 and 04:00 dungeons and the 12:15 trial were joined but never played)."""
+        c = self.find("dropsx", f, min_frac=0.9)
+        if not c:
+            return False
+        self.release_all()
+        now = time.monotonic()
+        if now - getattr(self, "_drops_logged", -1e9) > 60:
+            self._drops_logged = now
+            self.log("closed a boss 'Drops' panel (it hides the game's map and counters)")
+            self.shot("drops-panel", force=True)
+        self.click(*c)
+        self.status("closed the Drops panel")
+        self.sleep(0.4)
+        return True
 
     def close_join_event(self, f=None):
         c = self.find("joinevent", f)

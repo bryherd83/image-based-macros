@@ -203,7 +203,7 @@ class Farm:
             self.last_seen_check = now
             if g.find("worlds", f) or g.find("roomhud", f) or hud.has_minimap(f):
                 self.last_game_seen = now
-        if g.close_join_event(f):
+        if g.close_join_event(f) or g.close_drops(f):
             return
         mode = S["mode"]
         # ---- Dungeon / Trial popup: press its green check

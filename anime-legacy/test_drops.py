@@ -1,0 +1,24 @@
+"""Boss 'Drops' panel: found on every screenshot that has it, on none without it.
+    python test_drops.py   (needs testdata/screens)
+"""
+import glob, os, sys
+import cv2
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import hud
+
+T = hud.Templates()
+files = glob.glob(os.path.join(HERE, "testdata", "screens", "*.jpg"))
+
+hits = []
+for p in files:
+    f = cv2.imread(p)
+    if f is not None and f.shape[1] == 1920 and T.find(f, "dropsx", min_frac=0.9):
+        hits.append(os.path.basename(p))
+print(f"{len(files)} screenshots, Drops panel found on {len(hits)}: {sorted(hits)}")
+
+want = {"laptop-1017-030002-py-joining-dungeon.jpg", "laptop-1017-040002-py-joining-dungeon.jpg",
+        "laptop-1017-121501-py-joining-trial.jpg", "laptop-1017-123002-py-joining-dungeon.jpg",
+        "laptop-1017-120752-py-dungeon-finished.jpg"}
+assert set(hits) == want, set(hits) ^ want
+print("drops: ok")
