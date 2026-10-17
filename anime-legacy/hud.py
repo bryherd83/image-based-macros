@@ -25,6 +25,9 @@ REGIONS = {
     "create": ((0.00, 0.00, 1.00, 1.00), 70),
     "play": ((0.00, 0.00, 1.00, 1.00), 70),
     "close": ((0.70, 0.08, 0.92, 0.38), 100),
+    # a menu's X while the mouse is over it: tilted and bigger, so "close" misses it (PC 10-17:
+    # the Teleport menu stayed open because the farm couldn't see its X any more)
+    "close2": ((0.70, 0.08, 0.92, 0.38), 100),
     "leave": ((0.30, 0.00, 0.70, 0.20), 70),
     "spawn": ((0.30, 0.00, 0.70, 0.20), 70),
     "wave9": ((0.50, 0.00, 0.70, 0.10), 70),
@@ -56,6 +59,8 @@ class Templates:
     def find(self, frame: np.ndarray, name: str, region=None, tol=None, min_frac=0.97):
         """Centre (x, y) of the picture inside frame, or None."""
         frac, c = self.match(frame, name, region, tol)
+        if name == "close" and (c is None or frac < min_frac):
+            frac, c = self.match(frame, "close2", region, tol)     # the X with the mouse over it
         return c if c is not None and frac >= min_frac else None
 
     def match(self, frame: np.ndarray, name: str, region=None, tol=None):

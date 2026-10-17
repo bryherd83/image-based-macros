@@ -244,3 +244,12 @@ try:
 finally:
     culling.dt.datetime = real_dt
 print("teleport menu: ok")
+
+# 7. the Teleport menu's X with the mouse over it (tilted, bigger; PC 10-17 17:46 and 17:50) is
+#    still found, so the menu gets closed instead of "Defense won't open"
+T7 = hud.Templates()
+for n in ("1017-174640-py-defense-wont-open.jpg", "1017-175043-py-defense-wont-open.jpg"):
+    c7 = T7.find(cv2.imread(os.path.join(HERE, "testdata", "screens", n)), "close")
+    print("7:", n, "X at", c7)
+    assert c7 and abs(c7[0] - 1547) < 12 and abs(c7[1] - 252) < 12
+print("hovered X: ok")

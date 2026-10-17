@@ -366,6 +366,14 @@ def wiggle():
         time.sleep(0.015)
 
 
+def _nudge():
+    """Tiny real mouse moves right after a click: Roblox sometimes only acts on a click once the
+    mouse moves again (PC 10-17: a menu's X closed only after a hand nudged the mouse)."""
+    for dx, dy in ((2, 1), (-2, -1), (1, 2), (-1, -2)):
+        time.sleep(0.03)
+        mouse_rel(dx, dy)
+
+
 def click_screen(x: int, y: int, park=None, slow=False):
     """Roblox-proof click: glide onto the button, wiggle, press long enough to be seen.
     slow=True for buttons that ignored a click: approach from the other side in small steps,
@@ -385,6 +393,7 @@ def click_screen(x: int, y: int, park=None, slow=False):
         mouse_button("left", True)
         time.sleep(0.12)
         mouse_button("left", False)
+        _nudge()
         time.sleep(0.3)
         if park:
             move_to(*park)
@@ -397,6 +406,7 @@ def click_screen(x: int, y: int, park=None, slow=False):
     mouse_button("left", True)
     time.sleep(0.07)
     mouse_button("left", False)
+    _nudge()
     time.sleep(0.15)
     if park:
         move_to(*park)
