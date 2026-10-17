@@ -65,7 +65,8 @@ def allowed(ip):
         a = ipaddress.ip_address(ip)
     except ValueError:
         return False
-    return a.is_private or a.is_loopback
+    # home network, this PC, or your own devices through Tailscale (100.64.0.0/10)
+    return a.is_private or a.is_loopback or a in ipaddress.ip_network("100.64.0.0/10")
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

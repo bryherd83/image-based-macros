@@ -69,7 +69,7 @@ assert not os.path.exists(os.path.join(rc.ROOT, "evil.jpg"))                    
 assert post("/shot?from=x&name=a.jpg", b"MZ not a jpeg") == 400
 assert post("/shot?from=x&name=a.exe", b"\xff\xd8x") == 400
 assert post("/log?from=x&at=5", b"x") == 409
-assert rc.allowed("192.168.1.50") and rc.allowed("127.0.0.1") and not rc.allowed("8.8.8.8")
+assert rc.allowed("192.168.1.50") and rc.allowed("127.0.0.1") and rc.allowed("100.77.102.84") and not rc.allowed("8.8.8.8")
 
 # the receiver is this same PC: nothing is sent
 snd3 = logsend.Sender({}, laptop, me="ThePC")
