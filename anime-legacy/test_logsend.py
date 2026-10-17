@@ -89,3 +89,28 @@ found = logsend.find_receiver(timeout=2, addrs=["127.0.0.1"])   # (the firewall 
 print("found:", found)
 assert found and found[1] == rc.HTTP_PORT and found[2] == socket.gethostname()
 print("logsend: ok")
+
+
+# ---- live status page: state + screen picture in, page + /api out
+import json as _json
+import numpy as np
+rc.ROOT = os.path.join(tmp, "pc2")
+srv2 = http.server.ThreadingHTTPServer(("127.0.0.1", 0), rc.Handler)
+threading.Thread(target=srv2.serve_forever, daemon=True).start()
+port2 = srv2.server_address[1]
+snd4 = logsend.Sender({}, laptop, me="LAPTOP-1")
+snd4.target = ("127.0.0.1", port2, "ThePC")
+snd4.once()
+frame = np.zeros((1080, 1920, 3), np.uint8)
+assert snd4.send_live({"on": True, "run": "trial", "wave": "14/50", "doing": "<b>trial</b> wave 14"}, frame)
+api = _json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port2}/api").read())
+farm_ = api["farms"][0]
+print("api:", {k: farm_[k] for k in ("pc", "age", "pic_age", "dungeons", "trials")}, farm_["status"]["wave"])
+assert farm_["pc"] == "LAPTOP-1" and farm_["age"] <= 2 and farm_["status"]["run"] == "trial" and farm_["pic_age"] <= 2
+img = urllib.request.urlopen(f"http://127.0.0.1:{port2}/live.jpg?from=LAPTOP-1").read()
+assert img[:2] == b"\xff\xd8"
+page = urllib.request.urlopen(f"http://127.0.0.1:{port2}/").read().decode()
+assert "<script>" in page and "/api" in page
+open(os.path.join(tmp, "page.js"), "w", encoding="utf-8").write(page.split("<script>")[1].split("</script>")[0])
+print("page.js:", os.path.join(tmp, "page.js"))
+print("live page: ok")

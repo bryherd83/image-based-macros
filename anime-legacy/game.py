@@ -226,7 +226,10 @@ class Game:
         """The whole client area (BGR) or None."""
         if not self.window() or not self.rect:
             return None
-        return self.cap.grab(self.rect)
+        f = self.cap.grab(self.rect)
+        if f is not None:
+            self.last_frame = f        # for the live status page (read by another thread)
+        return f
 
     def grab(self, x, y, w, h):
         """Part of the client area (client pixels)."""

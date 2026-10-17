@@ -7,6 +7,7 @@ this same PC, or none answers, it sends nothing. Off with "log_send": false in s
 from __future__ import annotations
 
 import glob
+import json
 import os
 import socket
 import threading
@@ -155,8 +156,31 @@ class Sender:
         return n
 
 
-def start(settings, log_dir, every=60):
-    """Background thread for the farm."""
+    def send_live(self, status, frame=None):
+        """The farm's current state (and every so often a small picture of the screen) for the
+        receiver's live status page."""
+        if self.target is None or self.target[2].lower() == self.me.lower():
+            return False
+        body = json.dumps(status, default=str).encode()[:20000]
+        code, _ = self._post("/status", body)
+        if code != 200:
+            raise OSError(f"receiver said {code}")
+        if frame is not None:
+            try:
+                import cv2
+                h, w = frame.shape[:2]
+                small = cv2.resize(frame, (w // 2, h // 2), interpolation=cv2.INTER_AREA)
+                ok, jpg = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                if ok:
+                    self._post("/live", jpg.tobytes())
+            except Exception:
+                pass
+        return True
+
+
+def start(settings, log_dir, every=15, status_fn=None):
+    """Background threads for the farm: the log every `every` s; the live state every 5 s and
+    a picture of the screen every 20 s (status_fn() -> (dict, frame or None))."""
     if settings.get("log_send", True) is False:
         return None
     snd = Sender(settings, log_dir)
@@ -170,7 +194,20 @@ def start(settings, log_dir, every=60):
                 snd.target = None
             time.sleep(every)
 
-    t = threading.Thread(target=loop, daemon=True, name="logsend")
-    t.start()
+    def live():
+        last_pic = 0.0
+        while settings.get("log_send", True) is not False:
+            time.sleep(5)
+            try:
+                status, frame = status_fn()
+                pic = time.monotonic() - last_pic >= 20 and frame is not None
+                if snd.send_live(status, frame if pic else None) and pic:
+                    last_pic = time.monotonic()
+            except Exception:
+                pass
+
+    threading.Thread(target=loop, daemon=True, name="logsend").start()
+    if status_fn is not None:
+        threading.Thread(target=live, daemon=True, name="logsend-live").start()
     return snd
 

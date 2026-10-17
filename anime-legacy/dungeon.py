@@ -714,6 +714,10 @@ class DungeonRun:
                     self.last_hit_t = now
                 if en is not None and en.text != self.en_text:
                     self.en_text, self.en_change_t = en.text, now
+                info = getattr(e, "info", None)
+                if isinstance(info, dict):        # (the live status page)
+                    todo, done = self.mem.counts()
+                    info["rooms"] = f"{done} cleared · {todo} to do · {len(self.mem.rooms)} seen"
             v = self.read()
             if v is None:
                 self.stop()

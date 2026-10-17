@@ -381,7 +381,7 @@ class App:
         self.toast_until = 0.0
         self.show_box = True
         self.farm = Farm(self)
-        logsend.start(self.S, self.farm.game.logger.dir)   # to the log receiver on another PC, if any
+        logsend.start(self.S, self.farm.game.logger.dir, status_fn=self._live)   # to the log receiver on another PC, if any
         self._build_box()
         self._build_settings()
         threading.Thread(target=hotkey_thread, args=(self.q,), daemon=True).start()
@@ -408,6 +408,19 @@ class App:
         except Exception:
             pass
         self.box = b
+
+    def _live(self):
+        """What the live status page shows (sent by logsend every few seconds)."""
+        i = dict(self.info)
+        g = self.farm.game
+        status = {"on": bool(self.farm.running), "mode": self.S.get("mode"),
+                  "trials": bool(self.S.get("join_trials")), "run": i.get("run", "-"),
+                  "doing": i.get("doing", "-"), "enemies": i.get("enemies", "-"),
+                  "wave": i.get("wave", "-"), "rooms": i.get("rooms", "-"),
+                  "roblox_in_front": bool(g.active()) if hasattr(g, "active") else None,
+                  "time": time.strftime("%H:%M:%S")}
+        frame = getattr(g, "last_frame", None)
+        return status, frame if self.farm.running else None
 
     def set_info(self, info):
         self.info = dict(info)

@@ -11,6 +11,10 @@ to port 9121. They land in
 Safety: it only accepts text appended to that log and .jpg pictures, from private (home network)
 addresses, with size limits. Nothing can be read back except how much of the log it already has,
 and nothing is ever run. Pictures older than 3 days are deleted.
+
+Live status page (phone or any browser on the home network): http://<this PC's address>:9121/
+It shows what each farm is doing right now, a picture of its screen (every 20 s), today's
+dungeons and trials, problems and the latest log lines. Read-only.
 """
 from __future__ import annotations
 
@@ -18,7 +22,9 @@ import datetime as dt
 import glob
 import http.server
 import ipaddress
+import json
 import os
+import re
 import socket
 import sys
 import threading
@@ -81,10 +87,28 @@ class Handler(http.server.BaseHTTPRequestHandler):
         q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
         return u.path, q, safe_name(q.get("from"))
 
+    def _send_bytes(self, code, body, ctype):
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         if not allowed(self.client_address[0]):
             return self._send(403)
         path, q, sender = self._args()
+        if path in ("/", "/index.html"):
+            return self._send_bytes(200, PAGE.encode(), "text/html; charset=utf-8")
+        if path == "/api":
+            return self._send_bytes(200, json.dumps(overview()).encode(), "application/json")
+        if path == "/live.jpg" and sender:
+            p = os.path.join(ROOT, "from-" + sender, "live.jpg")
+            if os.path.exists(p):
+                with open(p, "rb") as f:
+                    return self._send_bytes(200, f.read(), "image/jpeg")
+            return self._send(404)
         if not sender:
             return self._send(400)
         d = folder(sender)
@@ -102,7 +126,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         if not sender or n <= 0:
             return self._send(400)
-        if n > (MAX_SHOT if path == "/shot" else MAX_CHUNK):
+        if n > (MAX_SHOT if path in ("/shot", "/live") else MAX_CHUNK):
             return self._send(413)
         data = self.rfile.read(n)
         d = folder(sender)
@@ -119,6 +143,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 with open(p, "ab") as f:
                     f.write(data)
                 return self._send(200, str(have + len(data)))
+        if path == "/status":
+            try:
+                st = json.loads(data.decode("utf-8"))
+                assert isinstance(st, dict)
+            except Exception:
+                return self._send(400)
+            st = {str(k)[:30]: str(v)[:300] for k, v in list(st.items())[:30]}
+            with lock:
+                LIVE[sender] = (time.time(), st)
+            return self._send(200, "ok")
+        if path == "/live":
+            if not data.startswith(b"\xff\xd8"):
+                return self._send(400)
+            tmp = os.path.join(d, "live.tmp")
+            with open(tmp, "wb") as f:
+                f.write(data)
+            os.replace(tmp, os.path.join(d, "live.jpg"))
+            return self._send(200, "ok")
         if path == "/shot":
             name = q.get("name", "")
             stem = safe_name(name[:-4] if name.lower().endswith(".jpg") else "", 60)
@@ -128,6 +170,101 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 f.write(data)
             return self._send(200, "ok")
         return self._send(404)
+
+
+LIVE = {}                      # sender -> (time received, status dict)
+LINE = re.compile(r"^(\d\d-\d\d) (\d\d:\d\d:\d\d)  (.*)$")
+PROBLEM_WORDS = ("pressing Spawn", "error", "couldn't reach", "frozen", "didn't show up",
+                 "reconnect", "stuck over and over", "won't clear", "Roblox didn't open", "no new frames")
+
+
+def summary(sender):
+    """Today's dungeons / trials / problems and the latest lines, from the received log."""
+    p = os.path.join(ROOT, "from-" + sender, "log-py.txt")
+    try:
+        with open(p, "rb") as f:
+            f.seek(max(0, os.path.getsize(p) - 600_000))
+            text = f.read().decode("utf-8", errors="replace")
+    except OSError:
+        return {}
+    today = dt.datetime.now().strftime("%m-%d")
+    rows = []
+    for ln in text.splitlines():
+        m = LINE.match(ln.rstrip("\r"))
+        if m and m.group(1) == today and not m.group(3).startswith("screenshot:"):
+            rows.append((m.group(2), m.group(3)))
+    dmins = [float(x) for _, msg in rows for x in re.findall(r"dungeon finished · \d+ rooms cleared by the macro in ([\d.]+) min", msg)]
+    trials = sum(1 for _, msg in rows if msg.startswith("trial: left after wave"))
+    problems, last = [], None
+    for t, msg in rows:
+        if any(w in msg for w in PROBLEM_WORDS) and not msg.startswith("saving an Instant Replay"):
+            if msg.startswith("trial: nothing hit") and last and last.startswith("trial: nothing hit"):
+                continue
+            problems.append(f"{t[:5]}  {msg[:120]}")
+        last = msg
+    return {"dungeons": len(dmins), "dungeon_avg": round(sum(dmins) / len(dmins), 1) if dmins else None,
+            "trials": trials, "problems": problems[-6:],
+            "lines": [f"{t}  {msg[:140]}" for t, msg in rows[-18:]],
+            "last_line": rows[-1][0] if rows else None}
+
+
+def overview():
+    out = []
+    for d in sorted(glob.glob(os.path.join(ROOT, "from-*"))):
+        sender = os.path.basename(d)[5:]
+        t, st = LIVE.get(sender, (None, {}))
+        live = os.path.join(d, "live.jpg")
+        out.append({"pc": sender, "age": round(time.time() - t) if t else None, "status": st,
+                    "pic_age": round(time.time() - os.path.getmtime(live)) if os.path.exists(live) else None,
+                    **summary(sender)})
+    return {"now": dt.datetime.now().strftime("%H:%M:%S"), "farms": out}
+
+
+PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anime Legacy farm</title>
+<style>
+body{margin:0;background:#111;color:#eee;font:15px system-ui,sans-serif}
+.card{margin:10px;padding:12px;background:#1d1d1d;border-radius:12px}
+h2{margin:0 0 6px;font-size:18px} .big{font-size:20px;font-weight:600;margin:4px 0}
+.ok{color:#5d5} .warn{color:#fc4} .bad{color:#f55} .dim{color:#999;font-size:13px}
+img{width:100%;border-radius:8px;margin-top:8px} pre{white-space:pre-wrap;font-size:12px;color:#bbb;margin:6px 0 0}
+.row{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+</style></head><body><div id="app">Loading...</div>
+<script>
+function esc(s){return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+// every value from a farm goes through esc() (or is a number / encodeURIComponent; PC names are
+// letters and digits only), so nothing a farm sends can add HTML to the page
+async function tick(){
+ try{
+  const r=await fetch("/api",{cache:"no-store"}); const j=await r.json(); let h="";
+  if(!j.farms.length) h='<div class="card">No farm has sent anything yet.</div>';
+  for(const f of j.farms){
+   const s=f.status||{}; let state,cls;
+   if(f.age==null||f.age>60){state="Not reporting"+(f.age!=null?" for "+Math.round(f.age/60)+" min":"")+" (macro closed, laptop asleep, or update not installed)";cls="bad"}
+   else if(s.on!=="True"){state="Farm is OFF (press F6 on the laptop)";cls="warn"}
+   else if(s.roblox_in_front==="False"){state="Paused: Roblox isn't the window in front";cls="warn"}
+   else if(s.run==="dungeon"){state="Dungeon";cls="ok"}
+   else if(s.run==="trial"){state="Trial · wave "+esc(s.wave);cls="ok"}
+   else{state="Waiting for the next dungeon / trial";cls="ok"}
+   h+='<div class="card"><h2>'+esc(f.pc)+'</h2><div class="big '+cls+'">'+state+'</div>';
+   if(f.age!=null&&f.age<=60){
+    h+='<div>'+esc(s.doing)+'</div><div class="row dim"><span>enemies '+esc(s.enemies)+'</span>';
+    if(s.run==="dungeon") h+='<span>rooms '+esc(s.rooms)+'</span>';
+    h+='<span>updated '+f.age+' s ago</span></div>';
+   }
+   if(f.pic_age!=null&&f.pic_age<300) h+='<img src="/live.jpg?from='+encodeURIComponent(f.pc)+'&t='+Date.now()+'"><div class="dim">screen '+f.pic_age+' s ago</div>';
+   h+='<div class="row"><span>Today: <b>'+(f.dungeons||0)+'</b> dungeons'+(f.dungeon_avg?' (avg '+f.dungeon_avg+' min)':'')+', <b>'+(f.trials||0)+'</b> trials</span></div>';
+   if(f.problems&&f.problems.length) h+='<div class="warn" style="margin-top:6px">Problems today:</div><pre>'+f.problems.map(esc).join("\n")+'</pre>';
+   else h+='<div class="ok dim" style="margin-top:6px">No problems today</div>';
+   h+='<details><summary class="dim">Latest log lines</summary><pre>'+(f.lines||[]).map(esc).join("\n")+'</pre></details></div>';
+  }
+  h+='<div class="dim" style="margin:10px">Page updated '+j.now+' · refreshes by itself</div>';
+  document.getElementById("app").innerHTML=h;
+ }catch(e){document.getElementById("app").innerHTML='<div class="card bad">Cannot reach the gaming PC (is it on and on the home Wi-Fi?)</div>'}
+}
+tick(); setInterval(tick,5000);
+</script></body></html>"""
 
 
 def answer_hellos():
