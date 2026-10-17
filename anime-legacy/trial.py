@@ -273,6 +273,10 @@ def run_trial(env, mode, leave_after):
             if hud.has_minimap(f):
                 env.log("minimap seen · this is a dungeon, not a trial")
                 return "dungeon"
+            find = getattr(env, "find", None)
+            if find and find("defheart", f):
+                env.log("HEALTH counter seen · this is Defense, not a trial")
+                return "defense"
         if mode != "culling" and now - last_pop > 3:
             last_pop = now
             pop = hud.find_popup(f)

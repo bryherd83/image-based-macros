@@ -35,6 +35,12 @@ REGIONS = {
     # the pink X of a boss's "Drops" panel (opens when the boss in the lobby gets clicked).
     # While it's open the game hides its own HUD, so joined dungeons/trials went unnoticed (10-17)
     "dropsx": ((0.72, 0.11, 0.88, 0.37), 70),
+    # the red heart of Defense mode's HEALTH counter (trials have no HEALTH counter). Defense has
+    # the same ROOM icon, Leave and Spawn as a trial, so without this the farm took it for one
+    "defheart": ((0.50, 0.00, 0.80, 0.10), 70),
+    # the orange key on Dragon City's card in the Worlds menu: opens Defense (like the dice for
+    # the Culling Game on Cursed Academy's card)
+    "key": ((0.15, 0.25, 0.85, 0.85), 70),
 }
 
 

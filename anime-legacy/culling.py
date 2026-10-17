@@ -47,6 +47,8 @@ class Culling:
         self.last_nav = 0.0
         self.last_afk = env.now()
         self.last_idle = env.now()
+        self.nav_clicks = {}
+        self.def_fails = 0
 
     # ---- keep the game from kicking you for being idle ----
     def anti_afk(self):
@@ -58,7 +60,7 @@ class Culling:
 
     def idle_click(self, f):
         e = self.env
-        sec = float(e.settings.get("idle_click_sec", 45))
+        sec = float(e.settings.get("idle_click_sec", 0))
         if sec <= 0 or e.now() - self.last_idle < sec:
             return
         self.last_idle = e.now()
@@ -152,7 +154,74 @@ class Culling:
         self.last_open_try = now
         self.open_culling(f)
 
+    # ---- Defense in between dungeons and trials (the game plays Defense by itself) ----
+    def defense_tick(self, f):
+        """Mode 'defense', not in a run: open Defense (Worlds menu -> Dragon City's key ->
+        Create -> Play) unless a Dungeon / Trial popup is due soon. Dungeons and trials are
+        joined from their popups by farm.tick, also from inside Defense."""
+        e = self.env
+        S = e.settings
+        now = e.now()
+        if isinstance(getattr(e, "info", None), dict):
+            e.info["run"] = "-"
+        kind, t = next_popup(("dungeon", "trial") if S.get("join_trials") else ("dungeon",),
+                             offset=float(S.get("popup_offset_sec", DEFAULT_OFFSET)))
+        due_in = (t - dt.datetime.now()).total_seconds()
+        just_started = self.last_start and now - self.last_start < 45
+        navigating = self.last_nav and now - self.last_nav < 15
+        if not just_started and navigating:
+            for name, msg in (("play", "pressed Play"), ("create", "pressed Create"), ("key", "opened Defense")):
+                c = e.find(name, f)
+                if c:
+                    n = self.nav_clicks.get(name, 0) + 1
+                    self.nav_clicks[name] = n
+                    if n > 3:                      # clicking it does nothing: close up, try later
+                        self.last_nav = 0
+                        x = e.find("close", f)
+                        if x:
+                            e.close_menu(*x)
+                        return
+                    e.click(*c)
+                    if name == "play":
+                        self.last_start, self.last_nav = now, 0
+                        self.def_fails = 0
+                        e.log("Defense: started · the game plays it until the next dungeon / trial popup")
+                    else:
+                        self.last_nav = now
+                    e.status(f"Defense: {msg}")
+                    return
+        if just_started:
+            e.status("Defense: starting...")
+            return
+        if due_in < float(S.get("defense_not_before_popup_sec", 60)):
+            self.waiting_room(f)                  # a popup comes in a moment: just wait for it
+            return
+        if self.last_in_run and now - self.last_in_run < float(S.get("after_run_wait_sec", 12)):
+            return
+        c = e.find("close", f)
+        if c and not navigating:                  # a menu we didn't open: close it
+            e.release_all()
+            e.close_menu(*c)
+            return
+        self.anti_afk()
+        fails = getattr(self, "def_fails", 0)
+        wait = 8 if fails < 4 else 120            # keeps failing: try again every 2 minutes
+        if now - self.last_open_try < wait:
+            e.status(f"Defense: next try in {wait - (now - self.last_open_try):.0f}s · next {kind} popup at {t:%H:%M:%S}")
+            return
+        self.last_open_try = now
+        self.def_fails = fails + 1
+        self.nav_clicks = {}
+        if self.def_fails == 4:
+            e.log("Defense: couldn't open it 4 times in a row · trying every 2 minutes · screenshot saved")
+            e.shot("defense-wont-open", force=True)
+        self.open_card(f, "key", "Defense", "Dragon City's key")
+
     def open_culling(self, f):
+        self.open_card(f, "dice", "Culling Game", "Cursed Academy's dice")
+
+    def open_card(self, f, icon, what, where):
+        """Worlds menu -> scroll to the card with `icon` -> click it."""
         e = self.env
         w = e.find("worlds", f)
         if w is None:
@@ -182,18 +251,18 @@ class Culling:
         for notch in (-1, 1):                   # down first, then up
             for _ in range(25):
                 fr = e.frame()
-                d = e.find("dice", fr)
+                d = e.find(icon, fr)
                 if d:
                     e.click(*d)
                     self.last_nav = e.now()
-                    e.status("opened Culling Game")
-                    e.log("opened Culling Game")
+                    e.status(f"opened {what}")
+                    e.log(f"opened {what}")
                     return
                 if e.find("close", fr) is None:   # menu closed somehow: stop scrolling
                     return
                 e.scroll(notch)
                 e.sleep(0.3)
-        e.status("couldn't find Cursed Academy's dice · retrying")
+        e.status(f"couldn't find {where} · retrying")
         c = e.find("close")
         if c:
             e.close_menu(*c)

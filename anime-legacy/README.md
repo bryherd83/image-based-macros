@@ -79,7 +79,7 @@ you may want to change:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `mode` | `dungeon` | `dungeon`, `culling` or `both` |
+| `mode` | `dungeon` | `dungeon`, `culling`, `both` (Culling + dungeons) or `defense` (dungeons, and Defense in between: opens Dragon City's key, Create, Play, then lets the game play it) |
 | `join_trials` | `true` | Join the Trial popup |
 | `trial_leave_after` | `21` | Leave the trial after this wave |
 | `skill_key` | `""` | A key to press every 1.5 s during runs, such as `"z"` |

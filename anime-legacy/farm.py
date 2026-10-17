@@ -232,6 +232,17 @@ class Farm:
         self.popup_watch(g, mode)
         # ---- in a dungeon or a trial?
         if (mode != "culling" or S["join_trials"]) and g.find("roomhud", f):
+            if g.find("defheart", f) and not hud.has_minimap(f):
+                # Defense mode, run by the game's own automation: hands off, only the
+                # Dungeon / Trial popups (checked above) are clicked
+                g.release_all()
+                g.info["run"] = "defense"
+                g.status("in Defense (the game plays it) · waiting for the next dungeon / trial popup")
+                if time.monotonic() - getattr(self, "_defense_logged", -1e9) > 600:
+                    self._defense_logged = time.monotonic()
+                    g.log("in Defense mode · leaving it to the game, only joining dungeon / trial popups")
+                time.sleep(0.5)
+                return
             is_dungeon = hud.has_minimap(f)
             for _ in range(3):                  # the screen can be dimmed for a moment
                 if is_dungeon:
@@ -252,12 +263,15 @@ class Farm:
                 if res == "paused":
                     g.status("trial paused · click on the Roblox window to go on")
                     g.log("trial paused (Roblox wasn't the active window)")
-                elif res != "stopped":
+                elif res not in ("stopped", "defense"):
                     g.status("trial finished")
                     g.log("trial finished")
                 return
         if mode == "dungeon":
             culling.waiting_room(f)
+            return
+        if mode == "defense":
+            culling.defense_tick(f)
             return
         culling.tick(f)
 
@@ -469,19 +483,21 @@ class App:
         self.mode_var = tk.StringVar(value=self.S["mode"])
         for r, (val, txt) in enumerate((("culling", "Culling Game"),
                                         ("dungeon", "Dungeons (waits for the Dungeon popup)"),
-                                        ("both", "Culling Game, and jump into Dungeons when they pop up")), start=1):
+                                        ("both", "Culling Game, and jump into Dungeons when they pop up"),
+                                        ("defense", "Dungeons, and Defense in between (the game plays Defense)")),
+                                       start=1):
             ttk.Radiobutton(w, text=txt, value=val, variable=self.mode_var, command=self._picked).grid(
                 row=r, column=0, columnspan=3, **pad)
         self.trial_var = tk.BooleanVar(value=self.S["join_trials"])
         ttk.Checkbutton(w, text="Also join Trials when they pop up, and leave after wave", variable=self.trial_var,
-                        command=self._picked).grid(row=4, column=0, columnspan=2, **pad)
+                        command=self._picked).grid(row=5, column=0, columnspan=2, **pad)
         self.leave_var = tk.StringVar(value=str(self.S["trial_leave_after"]))
         e = ttk.Entry(w, textvariable=self.leave_var, width=5)
-        e.grid(row=4, column=2, padx=4, sticky="w")
+        e.grid(row=5, column=2, padx=4, sticky="w")
         self.leave_var.trace_add("write", lambda *a: self._picked())
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
-            row=5, column=0, padx=12, pady=10, sticky="w")
-        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=5, column=1, columnspan=2,
+            row=6, column=0, padx=12, pady=10, sticky="w")
+        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=6, column=1, columnspan=2,
                                                                                sticky="w")
         self.settings_win = w
         w.withdraw()

@@ -22,3 +22,11 @@ want = {"laptop-1017-030002-py-joining-dungeon.jpg", "laptop-1017-040002-py-join
         "laptop-1017-120752-py-dungeon-finished.jpg"}
 assert set(hits) == want, set(hits) ^ want
 print("drops: ok")
+
+# Defense mode's HEALTH heart: on the Defense screenshot, on nothing else
+d = [os.path.basename(p) for p in glob.glob(os.path.join(HERE, "testdata", "screens", "*.*"))
+     if p.lower().endswith((".jpg", ".png")) and (lambda f: f is not None and f.shape[1] == 1920
+                                                  and T.find(f, "defheart"))(cv2.imread(p))]
+print("Defense HEALTH heart found on:", d)
+assert d == ["laptop-1017-defense-run.png"], d
+print("defense: ok")
