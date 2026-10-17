@@ -237,7 +237,23 @@ class Farm:
                 # Dungeon / Trial popups (checked above) are clicked
                 g.release_all()
                 g.info["run"] = "defense"
-                g.status("in Defense (the game plays it) · waiting for the next dungeon / trial popup")
+                wv = hud.read_counter(f, "wave", bx=hud.DEFENSE_WAVE_X)
+                g.info["wave"] = wv.text if wv else "?"
+                leave_at = int(S.get("defense_leave_after", 10))
+                now_m = time.monotonic()
+                if (mode == "defense" and leave_at > 0 and wv and wv.a >= leave_at
+                        and now_m - getattr(self, "_defense_left", -1e9) > 8):
+                    c = g.find("leave", f)
+                    if c:
+                        self._defense_left = now_m
+                        g.click(*c)
+                        g.log(f"Defense: wave {wv.a} reached · leaving (it starts again from the lobby)")
+                        g.status(f"Defense: wave {wv.a} · leaving")
+                        culling.last_in_run, culling.last_start, culling.last_nav = now_m, 0, 0
+                        time.sleep(2)
+                        return
+                g.status(f"in Defense (the game plays it) · wave {g.info['wave']} · leaving after wave {leave_at}"
+                         " or for the next dungeon / trial popup")
                 if time.monotonic() - getattr(self, "_defense_logged", -1e9) > 600:
                     self._defense_logged = time.monotonic()
                     g.log("in Defense mode · leaving it to the game, only joining dungeon / trial popups")

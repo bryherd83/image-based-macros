@@ -247,7 +247,7 @@ async function tick(){
    else if(s.roblox_in_front==="False"){state="Paused: Roblox isn't the window in front";cls="warn"}
    else if(s.run==="dungeon"){state="Dungeon";cls="ok"}
    else if(s.run==="trial"){state="Trial · wave "+esc(s.wave);cls="ok"}
-   else if(s.run==="defense"){state="Defense (the game plays it) · waiting for the next dungeon / trial";cls="ok"}
+   else if(s.run==="defense"){state="Defense · wave "+esc(s.wave)+" (the game plays it)";cls="ok"}
    else{state="Waiting for the next dungeon / trial";cls="ok"}
    h+='<div class="card"><h2>'+esc(f.pc)+'</h2><div class="big '+cls+'">'+state+'</div>';
    if(f.age!=null&&f.age<=60){

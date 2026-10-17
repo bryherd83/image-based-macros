@@ -129,3 +129,59 @@ tries = sum(1 for m in g.lines if m == "opened Defense")
 print("3:", g.state, f"{tries} tries in {g.t:.0f}s", [m for m in g.lines if "couldn't" in m])
 assert g.state != "defense" and tries <= 6 and sum("couldn't open it 4 times" in m for m in g.lines) == 1
 print("defense: ok")
+
+# 4. the real farm tick on the laptop's Defense screenshot (wave 12/50): reads the wave, presses
+#    Leave when leaving at wave 10, keeps hands off when leaving at wave 20 or in another mode
+import cv2  # noqa: E402
+import time  # noqa: E402
+import farm  # noqa: E402
+import hud  # noqa: E402
+
+shot = cv2.imread(os.path.join(HERE, "testdata", "screens", "laptop-1017-defense-run.png"))
+print("4: wave read", hud.read_counter(shot, "wave", bx=hud.DEFENSE_WAVE_X))
+
+
+class ShotGame:
+    def __init__(self):
+        self.tpl = hud.Templates()
+        self.info, self.clicks, self.lines = {}, [], []
+    def find(self, name, f=None, **kw): return self.tpl.find(shot if f is None else f, name, **kw)
+    def frame(self): return shot
+    def active(self): return True
+    def now(self): return time.monotonic()
+    def click(self, x, y, park=True): self.clicks.append((x, y))
+    def release_all(self): pass
+    def status(self, m): self.status_line = m
+    def log(self, m): self.lines.append(m)
+    def shot(self, *a, **k): pass
+    def close_join_event(self, f=None): return False
+    def close_drops(self, f=None): return False
+    class cap: mode = "test"
+
+
+def farm_tick(mode, leave_at):
+    F = object.__new__(farm.Farm)
+    F.S = {"mode": mode, "join_trials": True, "defense_leave_after": leave_at, "log_shot_minutes": 0}
+    now = time.monotonic()
+    F.last_watch = F.last_clean = F.last_seen_check = F.last_shot = now
+    F.last_game_seen = now
+    F.popup_watch = lambda g, m: None
+    g = ShotGame()
+    c = culling.Culling(g)
+    sleep, farm.time.sleep = farm.time.sleep, lambda s: None
+    try:
+        F.tick(g, c)
+    finally:
+        farm.time.sleep = sleep
+    return g
+
+
+g = farm_tick("defense", 10)
+print("   leave at 10:", g.clicks, g.lines)
+assert g.clicks == [(840, 122)] and "wave 12 reached" in g.lines[0] and g.info["wave"] == "12/50"
+g = farm_tick("defense", 20)
+print("   leave at 20:", g.clicks, g.status_line)
+assert not g.clicks and "wave 12/50" in g.status_line
+g = farm_tick("dungeon", 10)                 # Defense started by hand in another mode: left alone
+assert not g.clicks
+print("defense leave: ok")

@@ -106,6 +106,10 @@ for ch, (w, h, s) in _DIGITS.items():
     DIGITS[ch] = (np.frombuffer(s.encode(), np.uint8).reshape(h, w) == ord("1"), 5 if ch == "/" else 8)
 
 
+# Defense has an extra HEALTH box, so its counters sit ~110 px further left than a trial's
+DEFENSE_WAVE_X = 1025
+
+
 @dataclass
 class Counter:
     a: int
@@ -113,10 +117,11 @@ class Counter:
     text: str
 
 
-def read_counter(frame: np.ndarray, which: str) -> Counter | None:
-    """Reads 'a/b' from the ENEMIES box ('enemies') or the WAVE/ROOM box ('wave')."""
+def read_counter(frame: np.ndarray, which: str, bx: int | None = None) -> Counter | None:
+    """Reads 'a/b' from the ENEMIES box ('enemies') or the WAVE/ROOM box ('wave'). `bx` = left
+    edge of the box (1920 px), for other layouts (Defense's WAVE: DEFENSE_WAVE_X)."""
     H, W = frame.shape[:2]
-    bx, bw = (690, 110) if which == "enemies" else (1140, 100)
+    bx, bw = ((690, 110) if which == "enemies" else (1140, 100)) if bx is None else (bx, 100)
     bh = 30
     x0, y0 = round(bx * W / 1920), round(40 * H / 1080)
     box = frame[y0:y0 + bh, x0:x0 + bw]

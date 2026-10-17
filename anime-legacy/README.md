@@ -82,6 +82,7 @@ you may want to change:
 | `mode` | `dungeon` | `dungeon`, `culling`, `both` (Culling + dungeons) or `defense` (dungeons, and Defense in between: opens Dragon City's key, Create, Play, then lets the game play it) |
 | `join_trials` | `true` | Join the Trial popup |
 | `trial_leave_after` | `21` | Leave the trial after this wave |
+| `defense_leave_after` | `10` | Defense mode: press Leave once the WAVE counter shows this wave (0 = never), then start Defense again |
 | `skill_key` | `""` | A key to press every 1.5 s during runs, such as `"z"` |
 | `sprint_key` | `lctrl` | The game's sprint toggle |
 | `trial_sprint` | `false` | Sprint during trials too |
