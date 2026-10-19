@@ -207,6 +207,9 @@ class Game:
         self.rect = None
         self.held = set()
         self.sprint_on = None            # sprint: True/False once a dungeon has checked, None = unknown
+        # on the mount: True/False once a dungeon has checked, None = unknown. The game keeps you
+        # on it (also through teleports) until M is pressed again
+        self.mount_on = None
         self.zoom_hover = None
         self.info = {}
         self.last_rect_check = 0.0
@@ -465,6 +468,8 @@ class Game:
         if not self.active():
             return False
         winio.tap(self.S.get("mount_key", "m"), 60)
+        if self.mount_on is not None:
+            self.mount_on = not self.mount_on
         self.log(f"mount key pressed{' · ' + why if why else ''}")
         time.sleep(0.15)
         return True

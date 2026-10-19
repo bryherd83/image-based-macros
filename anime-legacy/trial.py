@@ -184,6 +184,13 @@ def sprint_off_for_trial(env, S):
     """Trials walk without sprint (it overshoots the enemies). Sprint is a toggle the game keeps
     on, and only switches while moving, so: if the last dungeon saw it on, walk a step and press
     it once. Unknown (no dungeon since the farm started): leave it, never guess."""
+    if getattr(env, "mount_on", None) is True and S.get("dungeon_mount", True):
+        # the mount stays on through the teleport and is much faster than sprinting: the learned
+        # walk-in times would overshoot the enemies
+        toggle_m = getattr(env, "toggle_mount", None)
+        if toggle_m:
+            toggle_m("trials walk without the mount")
+            env.sleep(0.3)
     if S.get("trial_sprint", False):
         return
     on = getattr(env, "sprint_on", None)

@@ -351,7 +351,8 @@ class DungeonRun:
         # which, so like sprint it's judged by the walking speed: the first check presses M and
         # the next one sees if that made it faster (if slower, it was already on: press again)
         self.mount = bool(env.settings.get("dungeon_mount", True)) and hasattr(env, "toggle_mount")
-        self.mount_probe = self.mount
+        # (known to be on already - the game keeps you mounted through teleports - no probe)
+        self.mount_probe = self.mount and getattr(env, "mount_on", None) is not True
         if self.mount:
             self.sprint_ref = max(self.sprint_ref, float(env.settings.get("mount_rooms_per_sec", 0) or 0))
         self.covered_since = None
@@ -955,7 +956,10 @@ class DungeonRun:
             if med < 0.95 * before:
                 e.toggle_mount("slower after that press, so it was already on the mount · pressing again")
                 self.sprint_pause = now + 120
+                e.mount_on = True
             else:
+                if med >= 0.78 * self.sprint_ref or med > 1.15 * before:
+                    e.mount_on = True
                 if med > 1.15 * before:
                     e.log(f"on the mount · {med / max(before, 1e-6):.1f}x as fast as before")
                     self.sprint_ref = max(ref, med)
@@ -963,6 +967,7 @@ class DungeonRun:
                     self.sprint_taps.clear()
             return
         if not self.mount_probe and med >= 0.82 * ref:
+            e.mount_on = True
             if med >= 0.92 * ref:                # on the mount: keep its speed up to date
                 self.sprint_ref = med if med > 1.25 * ref else 0.9 * ref + 0.1 * med
             return
