@@ -756,6 +756,11 @@ class DungeonRun:
                 self.rooms_cleared += 1
             self.last_here = here
             fight = en is not None and en.b > 0 and en.a < en.b
+            if here in (mm.SPAWN, mm.CLEARED):
+                # nothing to fight in the spawn room or a cleared one: the ENEMIES counter can
+                # still show the last room's enemies (PC 10-19 14:32: after Spawn it showed 3/4
+                # and the farm "fought" in the spawn room for a minute instead of leaving)
+                fight = False
             if fight and self.fight_since is None:
                 self.fight_since = now
             elif not fight:

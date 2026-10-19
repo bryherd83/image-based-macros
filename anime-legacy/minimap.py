@@ -185,7 +185,7 @@ class MapReader:
                     lav = door[max(0, round(my - hg - 2)):round(my + hg + 2) + 1,
                                max(0, round(mx - 0.3 * s)):round(mx + 0.3 * s) + 1]
                 tab = nm >= 2 and mid >= 0.35 and (n1 == 0 or e1 < 0.6 * mid) and (n2 == 0 or e2 < 0.6 * mid)
-                if tab or ((0, 0) in ((a, b), k2) and int(lav.sum()) >= 3):
+                if tab or int(lav.sum()) >= (3 if (0, 0) in ((a, b), k2) or s >= 20 else 2):
                     doors.add(((a, b), k2))
                     doors.add((k2, (a, b)))
                 elif k != HIDDEN and cells[k2] != HIDDEN and nm >= 2 and mid < 0.1:

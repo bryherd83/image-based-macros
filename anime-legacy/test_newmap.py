@@ -49,6 +49,11 @@ for name in ("1019-140205-py-dungeon-started.jpg", "1019-140211-py-trial-started
              "1019-140224-py-dungeon-popup-due.jpg", "1019-140236-py-dungeon-popup-due.jpg", "bug-38.png"):
     p = os.path.join(HERE, "testdata", "screens", "pc-1019-new-ui-" + name)
     assert hud.has_minimap(cv2.imread(p)), name
+# PC 10-19 14:33: standing in the spawn room after Spawn (ENEMIES still showing 3/4): the map
+# must say so, so the farm doesn't "fight" there
+for n in (42, 43, 44):
+    v = mm.MapReader().parse(hud.minimap_crop(cv2.imread(S % ("spawnstuck-%d" % n))))
+    assert v.here() == mm.SPAWN and v.cells.get((0, 1)) == mm.CLEARED and ((0, 0), (0, 1)) in v.doors, n
 # every key the farm may press is known (the mount key "m" was missing: crash on every press)
 import winio  # noqa: E402
 assert all(c in winio.SCAN for c in "abcdefghijklmnopqrstuvwxyz0123456789")

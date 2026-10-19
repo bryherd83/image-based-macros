@@ -393,6 +393,11 @@ class Game:
             winio.wiggle()
             time.sleep(0.04)
             self.zoom_hover = (x, y)
+        else:
+            winio.mouse_rel(1, 0)            # a tiny move: Roblox ignores clicks on a still mouse
+            time.sleep(0.02)
+            winio.mouse_rel(-1, 0)
+            time.sleep(0.02)
         winio.mouse_button("left", True)
         time.sleep(0.045)
         winio.mouse_button("left", False)
