@@ -347,6 +347,13 @@ class DungeonRun:
         # change (those runs sprinted)
         self.sprint_ref = float(env.settings.get("sprint_rooms_per_sec", 0) or
                                 env.settings.get("walk_rooms_per_sec", 0.4))
+        # the mount: much faster than sprinting. M gets on and off it and nothing on screen says
+        # which, so like sprint it's judged by the walking speed: the first check presses M and
+        # the next one sees if that made it faster (if slower, it was already on: press again)
+        self.mount = bool(env.settings.get("dungeon_mount", True)) and hasattr(env, "toggle_mount")
+        self.mount_probe = self.mount
+        if self.mount:
+            self.sprint_ref = max(self.sprint_ref, float(env.settings.get("mount_rooms_per_sec", 0) or 0))
         self.covered_since = None
         self.v = None
         self.misses = 0
@@ -457,8 +464,9 @@ class DungeonRun:
             self.env.save_setting("cam_px_per_rad", round(self.head.k))
         if self.head.nominal:
             self.env.save_setting("walk_rooms_per_sec", round(self.head.nominal, 3), quiet=True)
-            if 0.1 <= self.sprint_ref <= 2.0:
-                self.env.save_setting("sprint_rooms_per_sec", round(self.sprint_ref, 3), quiet=True)
+            if 0.1 <= self.sprint_ref <= 3.0:
+                self.env.save_setting("mount_rooms_per_sec" if self.mount else "sprint_rooms_per_sec",
+                                      round(self.sprint_ref, 3), quiet=True)
         return v
 
     # ---------------- minimap zoom ----------------
@@ -936,6 +944,45 @@ class DungeonRun:
         self.stop()
         return self.finished
 
+    def check_mount(self, now, med, ref):
+        """check_sprint with the mount key instead of sprint (the "fast speed" is then the
+        mount's)."""
+        h, e = self.head, self.env
+        if self.sprint_check is not None:
+            before, self.sprint_check = self.sprint_check, None
+            h.recent.clear()
+            self.sprint_t = now
+            if med < 0.95 * before:
+                e.toggle_mount("slower after that press, so it was already on the mount · pressing again")
+                self.sprint_pause = now + 120
+            else:
+                if med > 1.15 * before:
+                    e.log(f"on the mount · {med / max(before, 1e-6):.1f}x as fast as before")
+                    self.sprint_ref = max(ref, med)
+                if med >= 0.78 * self.sprint_ref:
+                    self.sprint_taps.clear()
+            return
+        if not self.mount_probe and med >= 0.82 * ref:
+            if med >= 0.92 * ref:                # on the mount: keep its speed up to date
+                self.sprint_ref = med if med > 1.25 * ref else 0.9 * ref + 0.1 * med
+            return
+        self.sprint_taps = [t for t in self.sprint_taps if now - t < 120]
+        if len(self.sprint_taps) >= 3:
+            self.sprint_pause = now + 120
+            e.log("walking stays slow after 3 mount presses · leaving the mount alone for 2 minutes")
+            return
+        why = "getting on the mount" if self.mount_probe else \
+            f"walking at {med / ref:.0%} of mount speed, so not on the mount"
+        self.mount_probe = False
+        if e.toggle_mount(why):
+            self.sprint_taps.append(now)
+            self.sprint_check = med
+        elif why == "getting on the mount":
+            self.mount = False                   # no mount here: look after sprint instead
+            return
+        self.sprint_t = now
+        h.recent.clear()
+
     def check_sprint(self, now):
         """Sprint is a toggle that stays on (also through teleports), and nothing on screen says
         whether it is. So: if the last straight-walking speeds are well under the sprint speed
@@ -949,6 +996,8 @@ class DungeonRun:
             return
         med = dist / secs                        # average straight-walking speed lately
         ref = self.sprint_ref
+        if self.mount:
+            return self.check_mount(now, med, ref)
         if self.sprint_check is not None:
             # just pressed it: faster now = it was off (good); slower = it had been on and
             # that press turned it off (an enemy or wall slowed the walk): press again

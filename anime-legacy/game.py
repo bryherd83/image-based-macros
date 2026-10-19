@@ -22,7 +22,7 @@ AHK_INI = os.path.expandvars(r"%USERPROFILE%\Downloads\anime-legacy-settings.ini
 DEFAULTS = {
     "mode": "dungeon",                 # culling | dungeon | both
     "join_trials": True,
-    "trial_leave_after": 21,
+    "trial_leave_after": 27,
     "leave_at_wave": 9,                # Culling Game: leave when the wave counter reaches this (0 = never)
     "skill_key": "",                   # e.g. "z" to press it every 1.5 s in runs ("" = never)
     "worlds_key": "t",
@@ -34,6 +34,8 @@ DEFAULTS = {
     "scan_room_px": 13,                # zoom used to look at the whole map
     "face_doors": True,                # doors only open while you look at them
     "dungeon_sprint": True,
+    "dungeon_mount": True,             # dungeons: ride the mount (much faster than sprinting)
+    "mount_key": "m",
     "sprint_key": "lctrl",
     "trial_sprint": False,             # trials: False = turn sprint off (dungeons always sprint)
     "cam_px_per_rad": 584,             # mouse movement per radian of camera turn (learned)
@@ -456,6 +458,15 @@ class Game:
             self.sprint_on = not self.sprint_on
         self.log(f"sprint key pressed{' · ' + why if why else ''}")
         time.sleep(0.12)
+        return True
+
+    def toggle_mount(self, why=""):
+        """Taps the mount key (gets on / off the mount). Only while Roblox is in front."""
+        if not self.active():
+            return False
+        winio.tap(self.S.get("mount_key", "m"), 60)
+        self.log(f"mount key pressed{' · ' + why if why else ''}")
+        time.sleep(0.15)
         return True
 
     def status(self, msg):

@@ -26,7 +26,8 @@ LEVELS = [10, 14, 17, 21, 24, 28, 32, 34, 38, 41, 45, 48, 52, 57, 60]
 class SimEnv:
     def __init__(self, seed=1, n_rooms=50, door_w=0.14, look_doors=True, k_true=650.0, k_guess=584.0,
                  drag_fail=0.0, speed=0.27, sprint=1.5, verbose=False, time_limit=25 * 60,
-                 arrow_follows="character", noise_px=0.35, sprint_on=True, treasure_far=2, fog=True):
+                 arrow_follows="character", noise_px=0.35, sprint_on=True, treasure_far=2, fog=True,
+                 mount=0.0, mounted=False):
         self.rng = random.Random(seed)
         self.t = 0.0
         self.verbose = verbose
@@ -39,6 +40,9 @@ class SimEnv:
         self.sprint_mult = sprint
         self.sprint = sprint_on        # sprint is a toggle in the game that stays on
         self.sprint_presses = 0
+        self.mount_mult = mount        # 0 = no mount (the macro then never presses M)
+        self.mounted = mounted
+        self.mount_presses = 0
         self.arrow_follows = arrow_follows
         self.noise_px = noise_px
         self.settings = {"cam_px_per_rad": k_guess, "walk_room_px": [41, 48], "scan_room_px": 10,
@@ -146,7 +150,7 @@ class SimEnv:
         if f or r:
             ang = self.cam + math.atan2(r, f)
             self.facing = ang
-            sp = self.speed * (self.sprint_mult if self.sprint else 1)
+            sp = self.speed * (self.mount_mult if self.mounted else (self.sprint_mult if self.sprint else 1))
             dx, dy = math.cos(ang) * sp * dt, math.sin(ang) * sp * dt
             if self.free(self.x + dx, self.y + dy):
                 self.x += dx; self.y += dy
@@ -291,6 +295,15 @@ class SimEnv:
     def set_sprint(self, on):
         self.sprint = on
         self.sleep(0.06)
+
+    def toggle_mount(self, why=""):
+        if not self.mount_mult:
+            return False
+        self.mounted = not self.mounted
+        self.mount_presses += 1
+        self.log(f"mount key pressed · {why}")
+        self.sleep(0.15)
+        return True
 
     def toggle_sprint(self, why=""):
         self.sprint = not self.sprint

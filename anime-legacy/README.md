@@ -25,6 +25,8 @@ stuck (no new room for 2 minutes) when the Trial pops up, it leaves for the Tria
   At most 6 times an hour.
 - **Sprint:** on in dungeons (checks your walking speed on the minimap and presses sprint if it's
   off), turned off for trials, where sprinting overshoots the enemies.
+- **Mount:** in dungeons it presses M to ride your mount (much faster than sprinting), and checks
+  the walking speed on the minimap to tell whether it's on it.
 - **Monitor off:** keeps working with the monitor switched off, using a slower screen-copy
   fallback.
 - **Trait-roll screens:** waits through the black full-screen "MYTHICAL TRAIT" animation
@@ -81,10 +83,12 @@ you may want to change:
 |---|---|---|
 | `mode` | `dungeon` | `dungeon`, `culling`, `both` (Culling + dungeons) or `defense` (dungeons, and Defense in between: opens Dragon City's key, Create, Play, then lets the game play it) |
 | `join_trials` | `true` | Join the Trial popup |
-| `trial_leave_after` | `21` | Leave the trial after this wave |
+| `trial_leave_after` | `27` | Leave the trial after this wave |
 | `defense_leave_after` | `10` | Defense mode: press Leave once the WAVE counter shows this wave (0 = never), then start Defense again |
 | `skill_key` | `""` | A key to press every 1.5 s during runs, such as `"z"` |
 | `sprint_key` | `lctrl` | The game's sprint toggle |
+| `dungeon_mount` | `true` | Ride the mount in dungeons (instead of sprinting) |
+| `mount_key` | `m` | The game's mount key |
 | `trial_sprint` | `false` | Sprint during trials too |
 | `dungeon_leave_for_trial_sec` | `120` | Leave a stuck dungeon for the Trial after this long without a new room |
 | `auto_reconnect` | `true` | Reopen the game after a disconnect or crash |

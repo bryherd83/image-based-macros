@@ -64,7 +64,7 @@ def wait_unhidden(env, most=2.0):
     t0 = env.now()
     while env.now() - t0 < most:
         f = env.frame()
-        if f is None or not hidden(f, getattr(env, "spawn_xy", None) or (1080, 122)):
+        if f is None or not hidden(f, getattr(env, "spawn_xy", None) or hud.SPAWN_XY):
             return
         env.status("trial: waiting for the teleport animation to finish")
         env.sleep(0.1)

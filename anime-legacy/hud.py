@@ -28,11 +28,17 @@ REGIONS = {
     # a menu's X while the mouse is over it: tilted and bigger, so "close" misses it (PC 10-17:
     # the Teleport menu stayed open because the farm couldn't see its X any more)
     "close2": ((0.70, 0.08, 0.92, 0.38), 100),
+    "worlds2": ((0.00, 0.40, 0.25, 0.80), 70),     # Worlds button, new look (10-19)
+    # 10-19 UI update: ENEMIES / WAVE / TIME, Leave and Spawn are one panel at the top centre.
+    # The *_old pictures are the look before it (kept for old screenshots / tests)
     "leave": ((0.30, 0.00, 0.70, 0.20), 70),
     "spawn": ((0.30, 0.00, 0.70, 0.20), 70),
+    "leave_old": ((0.30, 0.00, 0.70, 0.20), 70),
+    "spawn_old": ((0.30, 0.00, 0.70, 0.20), 70),
+    "roomhud_old": ((0.50, 0.00, 0.70, 0.12), 50),
     "wave9": ((0.50, 0.00, 0.70, 0.10), 70),
     "joinevent": ((0.20, 0.10, 0.80, 0.60), 70),
-    "roomhud": ((0.50, 0.00, 0.70, 0.12), 50),
+    "roomhud": ((0.30, 0.00, 0.70, 0.12), 80),     # (Defense draws the castle slightly differently)
     "dungeonpop": ((0.15, 0.35, 0.85, 0.95), 70),
     "trialpop": ((0.15, 0.35, 0.85, 0.95), 70),
     # the pink X of a boss's "Drops" panel (opens when the boss in the lobby gets clicked).
@@ -41,6 +47,7 @@ REGIONS = {
     # the red heart of Defense mode's HEALTH counter (trials have no HEALTH counter). Defense has
     # the same ROOM icon, Leave and Spawn as a trial, so without this the farm took it for one
     "defheart": ((0.50, 0.00, 0.80, 0.10), 70),
+    "defheart_old": ((0.50, 0.00, 0.80, 0.10), 70),
     # the orange key on Dragon City's card in the Worlds menu: opens Defense (like the dice for
     # the Culling Game on Cursed Academy's card)
     "key": ((0.15, 0.25, 0.85, 0.85), 70),
@@ -59,8 +66,12 @@ class Templates:
     def find(self, frame: np.ndarray, name: str, region=None, tol=None, min_frac=0.97):
         """Centre (x, y) of the picture inside frame, or None."""
         frac, c = self.match(frame, name, region, tol)
-        if name == "close" and (c is None or frac < min_frac):
-            frac, c = self.match(frame, "close2", region, tol)     # the X with the mouse over it
+        alt = {"close": "close2", "worlds": "worlds2", "roomhud": "roomhud_old", "leave": "leave_old",
+               "spawn": "spawn_old", "defheart": "defheart_old"}.get(name)
+        if alt and (c is None or frac < min_frac):
+            # close2: the X with the mouse over it; worlds2: the Worlds button after the
+            # game's 10-19 UI update (old look kept in case a server still has it)
+            frac, c = self.match(frame, alt, region, tol)
         return c if c is not None and frac >= min_frac else None
 
     def match(self, frame: np.ndarray, name: str, region=None, tol=None):
@@ -122,18 +133,58 @@ class Counter:
     text: str
 
 
-def read_counter(frame: np.ndarray, which: str, bx: int | None = None) -> Counter | None:
-    """Reads 'a/b' from the ENEMIES box ('enemies') or the WAVE/ROOM box ('wave'). `bx` = left
-    edge of the box (1920 px), for other layouts (Defense's WAVE: DEFENSE_WAVE_X)."""
+# Since the 10-19 UI update: (left edge relative to the castle icon's centre, size vs the digit
+# pictures, min (blue, green, red)) of each counter's number. The panel is centred, so it shifts
+# with the number of boxes (Defense has an extra HEALTH box): measured from the castle it's the
+# same everywhere (trial castle at x 911, Defense 828). ENEMIES: the old digit size, white
+# fading to pink; WAVE: pale yellow, 17/15 the size
+OLD_WHITE = (215, 215, 215)
+NEW_COUNTERS = {"enemies": (-146, 1.0, (175, 175, 215)), "wave": (27, 15 / 17, (140, 200, 215))}
+_TPL = None
+
+
+def castle_x(frame: np.ndarray) -> int | None:
+    """x (1920 px) of the castle icon next to WAVE in the new top panel, or None."""
+    global _TPL
+    if _TPL is None:
+        _TPL = Templates()
+    frac, c = _TPL.match(frame, "roomhud")
+    if c is None or frac < 0.97:
+        return None
+    return round(c[0] * 1920 / frame.shape[1])
+
+
+def read_counter(frame: np.ndarray, which: str, bx: int | None = None,
+                 old_bx: int | None = None) -> Counter | None:
+    """Reads 'a/b' from the ENEMIES box ('enemies') or the WAVE/ROOM box ('wave'): the new
+    layout (found from the castle icon) first, then the old one at `old_bx` (default: the old
+    trial layout). `bx` = only the old layout, box left edge at bx (1920 px)."""
+    if bx is not None:
+        return _read_counter(frame, bx, 1.0, OLD_WHITE)
+    cx = castle_x(frame)
+    if cx is not None:
+        dx, scale, col = NEW_COUNTERS[which]
+        r = _read_counter(frame, cx + dx, scale, col)
+        if r is not None:
+            return r
+    if old_bx is None:
+        old_bx = 690 if which == "enemies" else 1140
+    return _read_counter(frame, old_bx, 1.0, OLD_WHITE)
+
+
+def _read_counter(frame, bx, scale, col):
     H, W = frame.shape[:2]
-    bx, bw = ((690, 110) if which == "enemies" else (1140, 100)) if bx is None else (bx, 100)
-    bh = 30
+    bw, bh = 110, 30
     x0, y0 = round(bx * W / 1920), round(40 * H / 1080)
-    box = frame[y0:y0 + bh, x0:x0 + bw]
+    box = frame[y0:y0 + round(bh / scale) + 1, x0:x0 + round(bw / scale)]
     if box.shape[0] < bh or box.shape[1] < bw:
         return None
-    m = (box[..., 0] > 215) & (box[..., 1] > 215) & (box[..., 2] > 215)
+    if scale != 1.0:
+        box = cv2.resize(box, (bw, bh), interpolation=cv2.INTER_AREA)
+    m = (box[..., 0] > col[0]) & (box[..., 1] > col[1]) & (box[..., 2] > col[2])
     col_on = m.any(axis=0)
+    if scale != 1.0:                     # resized digits can start a pixel later
+        col_on = col_on | np.concatenate([col_on[1:], [False]])
     cands = []
     for ch, (bits, top) in DIGITS.items():
         th, tw = bits.shape
@@ -195,8 +246,38 @@ def dps_width(frame: np.ndarray) -> int | None:
     return round(w) if w >= 60 else None    # narrower than 'DPS: 0' = something else
 
 
+# Since the 10-19 UI update the DPS is a light-cyan line in the player box, left-aligned:
+# "<number> DPS" starting at x ~132 (y 426-441). "DPS" itself is ~33 px wide.
+NEW_DPS_BOX = (128, 424, 330, 444)
+NEW_DPS_WORD = 33
+
+
+def new_dps_number_width(frame: np.ndarray) -> int | None:
+    """Width (1920 px) of the number in front of 'DPS' in the new player box, or None."""
+    sx, sy = map_scale(frame)
+    x0, y0, x1, y1 = (round(NEW_DPS_BOX[0] * sx), round(NEW_DPS_BOX[1] * sy),
+                      round(NEW_DPS_BOX[2] * sx), round(NEW_DPS_BOX[3] * sy))
+    box = frame[y0:y1, x0:x1].astype(int)
+    if box.size == 0:
+        return None
+    cyan = (box[..., 0] > 170) & (box[..., 1] > 170) & (box[..., 2] < box[..., 1] + 10)
+    cols = np.flatnonzero(cyan.sum(axis=0) >= 2)
+    if cols.size == 0 or cols[0] > 8 * sx:           # the text always starts at the left edge
+        return None
+    end = cols[0]
+    for c in cols[1:]:                               # one line of text: no gap over 12 px
+        if c - end > 12 * sx:
+            break
+        end = c
+    w = (end - cols[0]) / sx
+    return round(w - NEW_DPS_WORD - 5) if w >= NEW_DPS_WORD + 10 else None
+
+
 def dps_hitting(frame: np.ndarray) -> bool | None:
     """True = damage is being done, False = the meter says ~0, None = can't read it."""
+    n = new_dps_number_width(frame)
+    if n is not None:
+        return n > 16                    # more than one digit ("0 DPS" = one digit)
     w = dps_width(frame)
     return None if w is None else w >= DPS_HIT_WIDTH
 
@@ -315,7 +396,7 @@ def compass_letters(frame) -> bool:
     N/S are 16-33% white pixels; on those two, 0%."""
     sx, sy = map_scale(frame)
     R = round(11 * sy)
-    for y in (50, 274):
+    for y in (mm.MAP_CY - mm.COMPASS_DY, mm.MAP_CY + mm.COMPASS_DY):
         X, Y = round(mm.MAP_CX * sx), round(y * sy)
         box = frame[max(0, Y - R):Y + R, max(0, X - R):X + R]
         if box.size == 0 or (box.min(axis=2) > 190).mean() < 0.05:
@@ -337,7 +418,10 @@ def black_share(img) -> float:
     return float((img.max(axis=2) < 12).mean())
 
 
-def spawn_hidden(frame, xy=(1080, 122)) -> bool:
+SPAWN_XY = (1149, 115)      # the Spawn button since the 10-19 UI update (was (1080, 122))
+
+
+def spawn_hidden(frame, xy=SPAWN_XY) -> bool:
     """The black-squares teleport animation is over the Spawn button (laptop 10-15: its picture
     then matched only 76%). The button itself has no black: 0% on every normal screenshot,
     82% under the animation."""

@@ -241,7 +241,7 @@ class Farm:
                 if c:                       # a window left open over the run (e.g. Teleport menu)
                     g.close_menu(*c)
                     return
-                wv = hud.read_counter(f, "wave", bx=hud.DEFENSE_WAVE_X)
+                wv = hud.read_counter(f, "wave", old_bx=hud.DEFENSE_WAVE_X)
                 g.info["wave"] = wv.text if wv else "?"
                 leave_at = int(S.get("defense_leave_after", 10))
                 now_m = time.monotonic()
