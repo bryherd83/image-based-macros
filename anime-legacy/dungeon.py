@@ -38,6 +38,7 @@ class Memory:
     def __init__(self):
         self.rooms: dict = {}          # (x, y) -> class
         self.doors: set = set()        # ((x,y),(x2,y2)) both ways
+        self.walls: set = set()        # gaps seen with no door (both ways)
         self.sure: set = set()         # doors actually walked through
         self.wall_seen: dict = {}
         self.cx = self.cy = 0          # the room you're in
@@ -108,9 +109,11 @@ class Memory:
             g = ((self.cx + p[0], self.cy + p[1]), (self.cx + q[0], self.cy + q[1]))
             self.doors.add(g)
             self.wall_seen[g] = 0
+            self.walls.discard(g)
         for (p, q) in v.walls:
             g = ((self.cx + p[0], self.cy + p[1]), (self.cx + q[0], self.cy + q[1]))
             if g not in self.doors:
+                self.walls.add(g)
                 continue
             self.wall_seen[g] = self.wall_seen.get(g, 0) + 1
             if self.wall_seen[g] >= (10 if g in self.sure else 3):
@@ -136,8 +139,13 @@ class Memory:
         return self.skip.get(r, 0) > now
 
     def plan(self, now):
-        """Shortest route through known doors to the nearest unfinished room:
-        a list of rooms starting with yours, or None."""
+        """Shortest route through known doors to the nearest unfinished room: a list of rooms
+        starting with yours, or None. With no such route, one that also uses gaps not seen as
+        walls (tiny door tabs on the zoomed-out map are easy to miss: laptop 10-19 16:35, 7
+        rooms left and no known way to them, so it sat in spawn)."""
+        return self._plan(now, False) or self._plan(now, True)
+
+    def _plan(self, now, unknown_ok):
         start = (self.cx, self.cy)
         if self.rooms.get(start) in TODO_KINDS and not self.skipped(start, now):
             return [start]
@@ -147,7 +155,9 @@ class Memory:
             n = q.popleft()
             for d in DIRS:
                 k = (n[0] + d[0], n[1] + d[1])
-                if k in prev or k not in self.rooms or (n, k) not in self.doors:
+                if k in prev or k not in self.rooms:
+                    continue
+                if (n, k) not in self.doors and (not unknown_ok or (n, k) in self.walls):
                     continue
                 if self.is_blocked(n, k, now):
                     continue
@@ -650,10 +660,6 @@ class DungeonRun:
             self.mem.block(path[0], path[1], now, 45)
             self.door_fail[edge] = 0
             self.recover_until = 0
-            if (path[0], path[1]) not in self.mem.sure:
-                # never walked through: probably not a door at all (a misread tab): forget it
-                self.mem.doors.discard((path[0], path[1]))
-                self.mem.doors.discard((path[1], path[0]))
             self.say(f"door {dir_name((dx, dy))} won't open · trying another way for 45s")
             e.shot("door-blocked")
             return
@@ -732,6 +738,13 @@ class DungeonRun:
                     self.last_popup_check = now
                     if self.trial_check(now):
                         break
+                    tr = getattr(e, "trace", None)
+                    if tr and self.v is not None:
+                        pth = self.mem.plan(now)
+                        tr(f"{getattr(e, '_last_status', '')}\nroom {self.mem.cx},{self.mem.cy} "
+                           f"off {self.v.offx:+.0f},{self.v.offy:+.0f} cam "
+                           f"{'?' if self.head.psi is None else round(math.degrees(self.head.psi))} "
+                           f"route {pth} doors {len(self.mem.doors) // 2} walls {len(self.mem.walls) // 2}")
                 en = e.enemies()
                 dps = getattr(e, "dps", None)
                 self.hitting = dps() if dps else None

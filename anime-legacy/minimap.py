@@ -219,9 +219,20 @@ class MapReader:
                 lm, l1, l2 = lavs
                 lav_tab = lm >= (3 if s >= 20 else 2) and l1 <= 0.4 * lm and l2 <= 0.4 * lm
                 tab = nm >= 2 and mid >= 0.35 and (n1 == 0 or e1 < 0.6 * mid) and (n2 == 0 or e2 < 0.6 * mid)
+                if (0, 0) in ((a, b), k2):
+                    # your room's white outline lies in these gaps (and its rounded corners
+                    # leave the corner bands darker, so it looked like a tab: laptop 16:33, the
+                    # farm ran into the wall north of it over and over). Only the tab's own
+                    # lavender counts here
+                    tab = False
                 if tab or lav_tab:
                     doors.add(((a, b), k2))
                     doors.add((k2, (a, b)))
+                elif math.hypot(mx - R, my - R) < 16 + 0.3 * s:
+                    # your arrow sits on this gap and can hide its tab: don't call it a wall
+                    # (Blayne, 10-19: "there is a door but the character is blocking it" - the
+                    # farm then forgot real doors and walked into walls or sat in spawn)
+                    pass
                 elif k != HIDDEN and cells[k2] != HIDDEN and nm >= 2 and mid < 0.1:
                     walls.add(((a, b), k2))
                     walls.add((k2, (a, b)))

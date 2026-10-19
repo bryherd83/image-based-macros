@@ -37,6 +37,9 @@ DEFAULTS = {
     # dungeons: ride the mount (moves like running, only faster - Blayne). F5 has a box. (The
     # circles on 10-19 15:32 came from a wall next to your room read as a door, not the mount.)
     "ride_mount": True,
+    # while the new minimap is being sorted out: a small picture every 2 s during dungeons (the
+    # game view + the minimap + what the farm is doing), sent to the PC with the log
+    "dungeon_trace": True,
     "mount_key": "m",
     "sprint_key": "lctrl",
     "trial_sprint": False,             # trials: False = turn sprint off (dungeons always sprint)
@@ -535,6 +538,26 @@ class Game:
 
     def shot(self, tag, force=False):
         self.logger.shot(self.frame(), tag, force)
+
+    def trace(self, text):
+        """Small debugging picture: game view (640x360) + minimap (2x) + the farm's state."""
+        if not self.S.get("dungeon_trace", True) or not self.S.get("log_enabled", True):
+            return
+        f = self.frame()
+        if f is None:
+            return
+        try:
+            view = cv2.resize(f, (640, 360), interpolation=cv2.INTER_AREA)
+            mm_img = cv2.resize(hud.minimap_crop(f), (360, 360), interpolation=cv2.INTER_NEAREST)
+            pic = np.hstack([view, mm_img])
+            pic = cv2.copyMakeBorder(pic, 0, 44, 0, 0, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+            for i, line in enumerate(str(text).split("\n")[:2]):
+                cv2.putText(pic, line[:120], (6, 378 + 20 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                            (255, 255, 255), 1, cv2.LINE_AA)
+            path = os.path.join(self.logger.dir, f"{dt.datetime.now():%m%d-%H%M%S}-py-trace.jpg")
+            cv2.imwrite(path, pic, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        except Exception:
+            pass
 
     def save_setting(self, key, value, quiet=False):
         if self.S.get(key) != value:
