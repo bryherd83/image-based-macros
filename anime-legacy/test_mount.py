@@ -13,6 +13,7 @@ import trial  # noqa: E402
 def run(seed, **kw):
     known = kw.pop("known", None)
     env = sim.SimEnv(seed=seed, mount=2.2, **kw)
+    env.settings["ride_mount"] = kw.pop("ride", True) if "ride" in kw else True
     env.mount_on = known
     env.log = lambda m, *a, **k: None
     dungeon.DungeonRun(env).run()
@@ -46,6 +47,13 @@ class TrialEnv:
 
 for on, want in ((True, 1), (False, 0), (None, 0)):
     t = TrialEnv(on)
-    trial.sprint_off_for_trial(t, {"dungeon_mount": True})
+    trial.sprint_off_for_trial(t, {})
     assert len(t.presses) == want and (on is not True or t.mount_on is False), (on, t.presses)
+# riding switched off (the default) but still mounted: it gets off once and stays off
+for seed in (1, 2):
+    env = sim.SimEnv(seed=seed, mount=2.4, mounted=True)
+    env.mount_on = None
+    env.log = lambda m, *a, **k: None
+    dungeon.DungeonRun(env).run()
+    assert not env.mounted and env.mount_presses == 1, (seed, env.mounted, env.mount_presses)
 print("mount: ok")

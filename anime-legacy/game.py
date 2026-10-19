@@ -34,7 +34,10 @@ DEFAULTS = {
     "scan_room_px": 13,                # zoom used to look at the whole map
     "face_doors": True,                # doors only open while you look at them
     "dungeon_sprint": True,
-    "dungeon_mount": True,             # dungeons: ride the mount (much faster than sprinting)
+    # dungeons: ride the mount. Off: a mount turns toward where you steer instead of moving
+    # there at once, and the farm's steering (strafing with A/D, short taps to line up with a
+    # door) goes round in circles on it (PC 10-19 15:32; the simulator agrees). F5 has a box.
+    "ride_mount": False,
     "mount_key": "m",
     "sprint_key": "lctrl",
     "trial_sprint": False,             # trials: False = turn sprint off (dungeons always sprint)

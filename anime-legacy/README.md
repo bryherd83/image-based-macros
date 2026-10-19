@@ -88,7 +88,7 @@ you may want to change:
 | `defense_leave_after` | `10` | Defense mode: press Leave once the WAVE counter shows this wave (0 = never), then start Defense again |
 | `skill_key` | `""` | A key to press every 1.5 s during runs, such as `"z"` |
 | `sprint_key` | `lctrl` | The game's sprint toggle |
-| `dungeon_mount` | `true` | Ride the mount in dungeons (instead of sprinting) |
+| `ride_mount` | `false` | Ride the mount in dungeons (F5 box; off: a mount turns toward where you steer and the farm can't steer it yet) |
 | `mount_key` | `m` | The game's mount key |
 | `trial_sprint` | `false` | Sprint during trials too |
 | `dungeon_leave_for_trial_sec` | `120` | Leave a stuck dungeon for the Trial after this long without a new room |

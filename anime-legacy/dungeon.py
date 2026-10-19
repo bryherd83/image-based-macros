@@ -182,6 +182,7 @@ class Heading:
         # a noisy first reading can't make sliding along a wall look like normal walking
         self.nominal = walk_speed if 0.05 <= walk_speed <= 2.0 else 0.0
         self.recent = deque(maxlen=10)  # latest straight walking (distance, seconds): sprint check
+        self.raw_speeds = deque(maxlen=8)  # latest speeds, whatever the direction
         self.odd = 0
         self.turn_pending = None       # (psi_before, px) waiting to be checked by walking
         self.confident = False
@@ -221,6 +222,7 @@ class Heading:
         speed = dist / dt
         if speed < 0.02:
             return None
+        self.raw_speeds.append(speed)             # any direction (the mount check uses it)
         # walking the way the keys say (not sliding along a wall): remember the speed, so the
         # dungeon can tell whether sprint is on (sprint stays at nominal, plain walking ~0.6x)
         raw = wrap(math.atan2(dy, dx) - ka)
@@ -350,7 +352,9 @@ class DungeonRun:
         # the mount: much faster than sprinting. M gets on and off it and nothing on screen says
         # which, so like sprint it's judged by the walking speed: the first check presses M and
         # the next one sees if that made it faster (if slower, it was already on: press again)
-        self.mount = bool(env.settings.get("dungeon_mount", True)) and hasattr(env, "toggle_mount")
+        self.mount = bool(env.settings.get("ride_mount", False)) and hasattr(env, "toggle_mount")
+        self.dismount_tried = False
+        self.dismount_check = None
         # (known to be on already - the game keeps you mounted through teleports - no probe)
         self.mount_probe = self.mount and getattr(env, "mount_on", None) is not True
         if self.mount:
@@ -910,6 +914,8 @@ class DungeonRun:
                 self.say(what)
                 continue
             self.hold(keys)
+            if keys:
+                self.check_dismount(now)
             if use_sprint and keys:
                 self.check_sprint(now)
             self.say(what)
@@ -949,6 +955,32 @@ class DungeonRun:
             e.sleep(0.02)
         self.stop()
         return self.finished
+
+    def check_dismount(self, now):
+        """Riding switched off but still on the mount (the game keeps you on it through
+        teleports): moving far faster than sprinting, in whatever direction (a mount doesn't go
+        where the keys say, so the straight-walking speeds can't be used) - press M, once per
+        dungeon, and once more if that made it faster (it was off: back off it)."""
+        e, h = self.env, self.head
+        if self.mount or not hasattr(e, "toggle_mount") or len(h.raw_speeds) < 6:
+            return
+        sp = sorted(h.raw_speeds)[len(h.raw_speeds) // 2]
+        ref = self.sprint_ref
+        if self.dismount_check is not None:
+            if now - self.dismount_check[0] < 2.5:
+                return
+            before = self.dismount_check[1]
+            self.dismount_check = None
+            if sp > 1.2 * before:
+                e.toggle_mount("faster after that press, so it got on the mount · getting off again")
+            e.mount_on = False
+            return
+        if self.dismount_tried or sp < 1.35 * ref:
+            return
+        self.dismount_tried = True
+        h.raw_speeds.clear()
+        if e.toggle_mount(f"moving at {sp / ref:.1f}x sprint speed, so still on the mount · getting off"):
+            self.dismount_check = (now, sp)
 
     def check_mount(self, now, med, ref):
         """check_sprint with the mount key instead of sprint (the "fast speed" is then the
@@ -1008,6 +1040,7 @@ class DungeonRun:
         ref = self.sprint_ref
         if self.mount:
             return self.check_mount(now, med, ref)
+
         if self.sprint_check is not None:
             # just pressed it: faster now = it was off (good); slower = it had been on and
             # that press turned it off (an enemy or wall slowed the walk): press again

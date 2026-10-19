@@ -27,7 +27,7 @@ class SimEnv:
     def __init__(self, seed=1, n_rooms=50, door_w=0.14, look_doors=True, k_true=650.0, k_guess=584.0,
                  drag_fail=0.0, speed=0.27, sprint=1.5, verbose=False, time_limit=25 * 60,
                  arrow_follows="character", noise_px=0.35, sprint_on=True, treasure_far=2, fog=True,
-                 mount=0.0, mounted=False):
+                 mount=0.0, mounted=False, mount_turn=0.0, mount_lag=0.0):
         self.rng = random.Random(seed)
         self.t = 0.0
         self.verbose = verbose
@@ -43,6 +43,10 @@ class SimEnv:
         self.mount_mult = mount        # 0 = no mount (the macro then never presses M)
         self.mounted = mounted
         self.mount_presses = 0
+        # a mount that turns toward the way you steer at mount_turn rad/s (0 = at once) and moves
+        # the way it faces, and speeds up / slows down over mount_lag seconds (0 = at once)
+        self.mount_turn, self.mount_lag = mount_turn, mount_lag
+        self.mfacing, self.mspeed = None, 0.0
         self.arrow_follows = arrow_follows
         self.noise_px = noise_px
         self.settings = {"cam_px_per_rad": k_guess, "walk_room_px": [41, 48], "scan_room_px": 10,
@@ -147,6 +151,28 @@ class SimEnv:
     def physics(self, dt):
         f = ("w" in self.keys) - ("s" in self.keys)
         r = ("d" in self.keys) - ("a" in self.keys)
+        if self.mounted and (self.mount_turn or self.mount_lag):
+            want_sp = self.speed * self.mount_mult if (f or r) else 0.0
+            if f or r:
+                want = self.cam + math.atan2(r, f)
+                if self.mfacing is None:
+                    self.mfacing = want
+                d = wrap(want - self.mfacing)
+                step = self.mount_turn * dt if self.mount_turn else abs(d)
+                self.mfacing = wrap(self.mfacing + max(-step, min(step, d)))
+            a = min(1.0, dt / self.mount_lag) if self.mount_lag else 1.0
+            self.mspeed += (want_sp - self.mspeed) * a
+            if self.mspeed > 1e-3 and self.mfacing is not None:
+                ang = self.mfacing
+                self.facing = ang
+                dx, dy = math.cos(ang) * self.mspeed * dt, math.sin(ang) * self.mspeed * dt
+                if self.free(self.x + dx, self.y + dy):
+                    self.x += dx; self.y += dy
+                elif self.free(self.x + dx, self.y):
+                    self.x += dx
+                elif self.free(self.x, self.y + dy):
+                    self.y += dy
+            f = r = 0
         if f or r:
             ang = self.cam + math.atan2(r, f)
             self.facing = ang

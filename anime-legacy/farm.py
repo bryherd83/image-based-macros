@@ -518,9 +518,12 @@ class App:
         e = ttk.Entry(w, textvariable=self.leave_var, width=5)
         e.grid(row=5, column=2, padx=4, sticky="w")
         self.leave_var.trace_add("write", lambda *a: self._picked())
+        self.mount_var = tk.BooleanVar(value=bool(self.S.get("ride_mount", False)))
+        ttk.Checkbutton(w, text="Ride the mount (M) in dungeons  (test: steering on it isn't reliable yet)",
+                        variable=self.mount_var, command=self._picked).grid(row=6, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
-            row=6, column=0, padx=12, pady=10, sticky="w")
-        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=6, column=1, columnspan=2,
+            row=7, column=0, padx=12, pady=10, sticky="w")
+        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=7, column=1, columnspan=2,
                                                                                sticky="w")
         self.settings_win = w
         w.withdraw()
@@ -528,6 +531,7 @@ class App:
     def _picked(self):
         self.S["mode"] = self.mode_var.get()
         self.S["join_trials"] = bool(self.trial_var.get())
+        self.S["ride_mount"] = bool(self.mount_var.get())
         try:
             self.S["trial_leave_after"] = int(self.leave_var.get())
         except ValueError:
