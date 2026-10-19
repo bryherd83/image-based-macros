@@ -67,6 +67,26 @@ def _circ_mean(fr: np.ndarray) -> float:
     return math.atan2(np.sin(t).sum(), np.cos(t).sum()) / (2 * math.pi)
 
 
+def _outline(bgr: np.ndarray, R: int, s: int):
+    """Centre (x, y) of the white outline around your own room, or None."""
+    N = bgr.shape[0]
+    yy, xx = np.mgrid[0:N, 0:N]
+    d2 = (xx - R) ** 2 + (yy - R) ** 2
+    w = (bgr.min(axis=2) > 240) & (d2 > 14 * 14) & (d2 <= R * R)       # (not the arrow)
+    n, _, st, _ = cv2.connectedComponentsWithStats(w.astype(np.uint8), connectivity=8)
+    best = None
+    for i in range(1, n):
+        x, y, ww, hh, a = (int(v) for v in st[i])
+        if (1.0 * s <= ww <= 1.5 * s + 4 and 1.0 * s <= hh <= 1.5 * s + 4 and 0.8 < ww / hh < 1.25
+                and x - 10 < R < x + ww + 10 and y - 10 < R < y + hh + 10):
+            if best is None or a > best[4]:
+                best = (x, y, ww, hh, a)
+    if best is None:
+        return None
+    x, y, ww, hh, _ = best
+    return x + (ww - 1) / 2, y + (hh - 1) / 2
+
+
 class MapReader:
     """Keeps the room spacing between frames (a frame with few whole tiles can't measure it)."""
 
@@ -133,6 +153,13 @@ class MapReader:
         fy = np.array([(b[1] - R) / p for b in ref])
         gx = R + _circ_mean(fx - np.round(fx)) * p
         gy = R + _circ_mean(fy - np.round(fy)) * p
+        # your own room has a white outline: its centre is exact (the tiles' centroids sit a few
+        # px low because of their white top line, and big tiles are cut off by the rim), and it
+        # is the room the game says you're in - also while you stand in a doorway (PC 10-19
+        # 16:02: at a doorway the nearest tile flipped back and forth and the farm with it)
+        ol = _outline(bgr, R, s)
+        if ol is not None and abs(ol[0] - gx) < 0.75 * p and abs(ol[1] - gy) < 0.75 * p:
+            gx, gy = ol
         cells, area = {}, {}
         for cx, cy, w, h, a, k, clipped in blobs:
             if a < (0.12 if clipped else 0.25) * s * s:

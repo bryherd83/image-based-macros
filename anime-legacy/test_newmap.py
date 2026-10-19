@@ -63,3 +63,24 @@ assert ((-1, 0), (0, 0)) not in v.doors and ((-1, 0), (-1, 1)) in v.doors and ((
 import winio  # noqa: E402
 assert all(c in winio.SCAN for c in "abcdefghijklmnopqrstuvwxyz0123456789")
 print("new minimap: ok")
+
+# PC 10-19 16:04: standing in a doorway, the game still counts you in the outlined room: the
+# farm must too (offset past the room's edge, not the next room's)
+v = mm.MapReader().parse(hud.minimap_crop(cv2.imread(S % "wall-45")))
+assert v.cells[(0, 0)] == mm.CLEARED and 20 < v.offy < 28 and abs(v.offx) < 3, (v.offx, v.offy)
+
+# zoom: when no zoom step lands in the walking range it stops instead of clicking -/+ back and
+# forth (PC 10-19 16:0x)
+import sim  # noqa: E402
+import dungeon  # noqa: E402
+env = sim.SimEnv(seed=1)
+env.log = lambda m, *a, **k: None
+run = dungeon.DungeonRun(env)
+env.stats["zoom_clicks"] = 0
+run.zoom_to(1000, 1001)                         # bigger than any level: zooms in, then stops
+c1 = env.stats["zoom_clicks"]
+run.zoom_to(int(run.env.view().s) + 1, int(run.env.view().s) + 1)   # between two levels
+c2 = env.stats["zoom_clicks"] - c1
+print("zoom clicks:", c1, c2)
+assert c2 <= 4, c2
+print("doorway + zoom: ok")

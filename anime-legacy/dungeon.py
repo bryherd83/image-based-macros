@@ -477,7 +477,7 @@ class DungeonRun:
     # ---------------- minimap zoom ----------------
     def zoom_to(self, lo, hi, max_clicks=18):
         self.stop()
-        last_s, same = None, 0
+        last_s, same, last_dir = None, 0, 0
         for _ in range(max_clicks):
             v = self.env.view()
             if v is None:
@@ -493,8 +493,16 @@ class DungeonRun:
                 if self.env.has_minimap():
                     self.env.log(f"minimap zoom stuck at {v.s}px rooms (clicks not registering?)")
                 break
-            last_s = v.s
-            self.env.zoom(-1 if v.s > hi else +1)
+            d = -1 if v.s > hi else +1
+            if last_dir and d != last_dir:
+                # overshot (no zoom step lands in lo..hi, or a misread size): stay here rather
+                # than clicking - and + back and forth (PC 10-19 16:0x: a 10 s burst of that)
+                if d == +1:
+                    self.env.zoom(+1)      # (prefer the bigger of the two sizes)
+                    self.env.sleep(0.12)
+                break
+            last_s, last_dir = v.s, d
+            self.env.zoom(d)
             self.env.sleep(0.12)
         self.mem.forget_offset()
         self.head.reset_segment()
@@ -632,8 +640,8 @@ class DungeonRun:
             e.tap("space", 80)
             self.recover_vec, self.recover_until = (-dx * 0.2, -dy * 0.2), now + 1.0
             self.recover_why = "stuck · jumping and backing up"
-        elif n <= 6:
-            off = (0.07 if n <= 4 else 0.14) * (1 if n % 2 else -1)
+        elif n <= 4:
+            off = (0.07 if n <= 3 else 0.14) * (1 if n % 2 else -1)
             self.recover_vec = (-dx * 0.2 + side[0] * off, -dy * 0.2 + side[1] * off)
             self.recover_until = now + 1.2
             self.recover_why = f"stuck ({n}) · backing up and stepping {'right' if off > 0 else 'left'}"
@@ -642,6 +650,10 @@ class DungeonRun:
             self.mem.block(path[0], path[1], now, 45)
             self.door_fail[edge] = 0
             self.recover_until = 0
+            if (path[0], path[1]) not in self.mem.sure:
+                # never walked through: probably not a door at all (a misread tab): forget it
+                self.mem.doors.discard((path[0], path[1]))
+                self.mem.doors.discard((path[1], path[0]))
             self.say(f"door {dir_name((dx, dy))} won't open · trying another way for 45s")
             e.shot("door-blocked")
             return
