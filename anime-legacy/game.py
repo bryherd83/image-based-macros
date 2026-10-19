@@ -55,7 +55,8 @@ DEFAULTS = {
     "trial_dps_settle_sec": 2.0,       # longest extra wait for the DPS meter to drop to 0 after a room
     "trial_respawn_sec": 10,           # walked all the way in, nothing hit this long: Spawn again
     "trial_give_up_sec": 180,
-    "defense_leave_after": 10,         # Defense mode: leave after this wave, then start it again          # this long retrying one room without a hit: leave the trial
+    "defense_leave_after": 10,
+    "defense_not_before_popup_sec": 300,   # Defense: don't start one this close to a dungeon / trial         # Defense mode: leave after this wave, then start it again          # this long retrying one room without a hit: leave the trial
     "trial_step_ms": 300,              # one step further in = W held this long
     "trial_max_steps": 8,
     "trial_side_ms": 750,              # sideways move between zigzag lanes (~0.2 of a room)

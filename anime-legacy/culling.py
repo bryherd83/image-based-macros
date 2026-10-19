@@ -204,7 +204,7 @@ class Culling:
                 return
             e.status("Defense: starting...")
             return
-        if due_in < float(S.get("defense_not_before_popup_sec", 60)):
+        if due_in < float(S.get("defense_not_before_popup_sec", 300)):
             self.waiting_room(f)                  # a popup comes in a moment: just wait for it
             return
         c = e.find("close", f)

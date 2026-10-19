@@ -122,6 +122,15 @@ run(g, dt.datetime(2026, 10, 17, 17, 14, 32), ticks=40)
 print("2:", g.state, "clicks", len(g.clicks))
 assert g.state == "lobby" and not g.clicks
 
+# 2b. 4 minutes before a popup: still waits (not within 5 min); 6 minutes before: goes
+g = FakeGame()
+run(g, dt.datetime(2026, 10, 17, 17, 11, 0), ticks=40)
+assert g.state == "lobby" and not g.clicks, g.state
+g = FakeGame()
+run(g, dt.datetime(2026, 10, 17, 17, 9, 0))
+print("2b: 6 min before ->", g.state)
+assert g.state == "defense"
+
 # 3. the key never opens Defense: it backs off to once every 2 minutes and says so once
 g = FakeGame(key_works=False)
 c = run(g, dt.datetime(2026, 10, 17, 17, 1, 0), ticks=400)
