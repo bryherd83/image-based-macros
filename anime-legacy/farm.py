@@ -482,8 +482,11 @@ class App:
                     lines = self.toast_msg.split("\n") + [""] + lines
                 self.box_text.configure(text="\n".join(lines))
                 if r:
+                    # bottom-right corner: since the game's 10-19 UI update the old spot (left,
+                    # 70% down) covered the game's own panels
                     x, y, W, H = r
-                    self.box.geometry(f"+{x + 8}+{y + round(H * 0.70) - (14 * max(0, len(lines) - 5))}")
+                    bw, bh = self.box.winfo_reqwidth(), self.box.winfo_reqheight()
+                    self.box.geometry(f"+{x + W - bw - 8}+{y + H - bh - 8}")
                 else:
                     self.box.geometry("+20+600")
                 self.box.deiconify()

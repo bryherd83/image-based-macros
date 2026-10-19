@@ -43,4 +43,13 @@ assert len(mm.MapReader().parse(hud.minimap_crop(cv2.imread(S % "dg-37"))).cells
 # no minimap: lobby, trial, Defense, lobby with a popup
 for name in ("lobby", "dungeon-24", "dungeon-25", "dungeon-26", "defense", "dg-28"):
     assert not hud.has_minimap(cv2.imread(S % name)), name
+# PC 10-19 14:02: the + button looked lighter (mouse over it) and the dungeon was taken for a
+# trial; these are all dungeon frames
+for name in ("1019-140205-py-dungeon-started.jpg", "1019-140211-py-trial-started.jpg",
+             "1019-140224-py-dungeon-popup-due.jpg", "1019-140236-py-dungeon-popup-due.jpg", "bug-38.png"):
+    p = os.path.join(HERE, "testdata", "screens", "pc-1019-new-ui-" + name)
+    assert hud.has_minimap(cv2.imread(p)), name
+# every key the farm may press is known (the mount key "m" was missing: crash on every press)
+import winio  # noqa: E402
+assert all(c in winio.SCAN for c in "abcdefghijklmnopqrstuvwxyz0123456789")
 print("new minimap: ok")

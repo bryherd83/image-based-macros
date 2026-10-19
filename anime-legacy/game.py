@@ -468,7 +468,11 @@ class Game:
         """Taps the mount key (gets on / off the mount). Only while Roblox is in front."""
         if not self.active():
             return False
-        winio.tap(self.S.get("mount_key", "m"), 60)
+        try:
+            winio.tap(self.S.get("mount_key", "m"), 60)
+        except KeyError:
+            self.log(f"mount key {self.S.get('mount_key')!r} isn't a key the farm can press · not using the mount")
+            return False
         if self.mount_on is not None:
             self.mount_on = not self.mount_on
         self.log(f"mount key pressed{' · ' + why if why else ''}")

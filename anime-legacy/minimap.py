@@ -278,5 +278,5 @@ def has_minimap(disc_bgr: np.ndarray, buttons_bgr: np.ndarray | None) -> bool:
         pg = part[..., 1].astype(int)
         pr = part[..., 2].astype(int)
         gold = (pr > 200) & (pg > 130) & (pg < 225) & (pb < 110)
-        ok.append(gold.mean() >= 0.3)
+        ok.append(gold.mean() >= 0.15)      # (the + button: its white cross takes up much of it)
     return all(ok)
