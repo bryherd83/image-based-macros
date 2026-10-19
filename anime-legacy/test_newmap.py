@@ -54,6 +54,11 @@ for name in ("1019-140205-py-dungeon-started.jpg", "1019-140211-py-trial-started
 for n in (42, 43, 44):
     v = mm.MapReader().parse(hud.minimap_crop(cv2.imread(S % ("spawnstuck-%d" % n))))
     assert v.here() == mm.SPAWN and v.cells.get((0, 1)) == mm.CLEARED and ((0, 0), (0, 1)) in v.doors, n
+# PC 10-19 15:37: the plain wall between the room west of you and yours (your room's white
+# outline and glow along it) was read as a door, and the farm kept walking into it
+v = mm.MapReader().parse(hud.minimap_crop(cv2.imread(os.path.join(
+    HERE, "testdata", "screens", "pc-1019-new-ui-1019-153715-py-every-5min.jpg"))))
+assert ((-1, 0), (0, 0)) not in v.doors and ((-1, 0), (-1, 1)) in v.doors and ((0, 0), (0, 1)) in v.doors
 # every key the farm may press is known (the mount key "m" was missing: crash on every press)
 import winio  # noqa: E402
 assert all(c in winio.SCAN for c in "abcdefghijklmnopqrstuvwxyz0123456789")

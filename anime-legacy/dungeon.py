@@ -352,7 +352,7 @@ class DungeonRun:
         # the mount: much faster than sprinting. M gets on and off it and nothing on screen says
         # which, so like sprint it's judged by the walking speed: the first check presses M and
         # the next one sees if that made it faster (if slower, it was already on: press again)
-        self.mount = bool(env.settings.get("ride_mount", False)) and hasattr(env, "toggle_mount")
+        self.mount = bool(env.settings.get("ride_mount", True)) and hasattr(env, "toggle_mount")
         self.dismount_tried = False
         self.dismount_check = None
         # (known to be on already - the game keeps you mounted through teleports - no probe)

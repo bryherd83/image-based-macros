@@ -49,9 +49,10 @@ for on, want in ((True, 1), (False, 0), (None, 0)):
     t = TrialEnv(on)
     trial.sprint_off_for_trial(t, {})
     assert len(t.presses) == want and (on is not True or t.mount_on is False), (on, t.presses)
-# riding switched off (the default) but still mounted: it gets off once and stays off
+# riding switched off in F5 but still mounted: it gets off once and stays off
 for seed in (1, 2):
     env = sim.SimEnv(seed=seed, mount=2.4, mounted=True)
+    env.settings["ride_mount"] = False
     env.mount_on = None
     env.log = lambda m, *a, **k: None
     dungeon.DungeonRun(env).run()

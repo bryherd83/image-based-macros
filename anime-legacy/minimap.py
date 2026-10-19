@@ -176,16 +176,23 @@ class MapReader:
                     else:
                         bands.append(share(mx + lo * s, mx + hi * s, my - hg, my + hg))
                 (mid, nm), (e1, n1), (e2, n2) = bands
-                # (your own room's white outline runs along its whole side: there, count the
-                # lavender of the tab itself instead)
-                if g[0]:
-                    lav = door[max(0, round(my - 0.3 * s)):round(my + 0.3 * s) + 1,
-                               max(0, round(mx - hg - 2)):round(mx + hg + 2) + 1]
-                else:
-                    lav = door[max(0, round(my - hg - 2)):round(my + hg + 2) + 1,
-                               max(0, round(mx - 0.3 * s)):round(mx + 0.3 * s) + 1]
+                # the tab's own lavender, in the same three bands: a tab is only in the middle;
+                # your room's white outline and its glow run along the whole side (PC 10-19
+                # 15:37: a plain wall next to your room was taken for a door, and the farm kept
+                # walking into it)
+                lavs = []
+                for lo, hi in ((-0.2, 0.2), (-0.48, -0.3), (0.3, 0.48)):
+                    if g[0]:
+                        sl = door[max(0, round(my + lo * s)):max(0, round(my + hi * s)) + 1,
+                                  max(0, round(mx - hg - 2)):round(mx + hg + 2) + 1]
+                    else:
+                        sl = door[max(0, round(my - hg - 2)):round(my + hg + 2) + 1,
+                                  max(0, round(mx + lo * s)):max(0, round(mx + hi * s)) + 1]
+                    lavs.append(int(sl.sum()))
+                lm, l1, l2 = lavs
+                lav_tab = lm >= (3 if s >= 20 else 2) and l1 <= 0.4 * lm and l2 <= 0.4 * lm
                 tab = nm >= 2 and mid >= 0.35 and (n1 == 0 or e1 < 0.6 * mid) and (n2 == 0 or e2 < 0.6 * mid)
-                if tab or int(lav.sum()) >= (3 if (0, 0) in ((a, b), k2) or s >= 20 else 2):
+                if tab or lav_tab:
                     doors.add(((a, b), k2))
                     doors.add((k2, (a, b)))
                 elif k != HIDDEN and cells[k2] != HIDDEN and nm >= 2 and mid < 0.1:

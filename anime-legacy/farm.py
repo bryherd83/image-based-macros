@@ -518,8 +518,8 @@ class App:
         e = ttk.Entry(w, textvariable=self.leave_var, width=5)
         e.grid(row=5, column=2, padx=4, sticky="w")
         self.leave_var.trace_add("write", lambda *a: self._picked())
-        self.mount_var = tk.BooleanVar(value=bool(self.S.get("ride_mount", False)))
-        ttk.Checkbutton(w, text="Ride the mount (M) in dungeons  (test: steering on it isn't reliable yet)",
+        self.mount_var = tk.BooleanVar(value=bool(self.S.get("ride_mount", True)))
+        ttk.Checkbutton(w, text="Ride the mount (M) in dungeons",
                         variable=self.mount_var, command=self._picked).grid(row=6, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
             row=7, column=0, padx=12, pady=10, sticky="w")
