@@ -411,8 +411,12 @@ class DungeonRun:
         self.last_spawn = -1e9
         # camera turns: done within turn_tol (rad), re-aimed at a door past turn_retol. Were 0.12 /
         # 0.13 (7 deg): the camera ended a few degrees off after most turns (Blayne 10-20)
-        self.turn_tol = float(S.get("turn_tol", 0.05))
-        self.turn_retol = float(S.get("turn_retol", 0.08))
+        # (0.05 / 0.08 made the laptop's turns ~2 s each with the extra small corrections:
+        # 4.6 / 5.7 deg keeps them straighter than before without most of those, Blayne 10-20)
+        self.turn_tol = float(S.get("turn_tol", 0.08))
+        self.turn_retol = float(S.get("turn_retol", 0.10))
+        self.time_in: dict = {}        # seconds per activity this dungeon (for the log)
+        self._say_t = None
         self.turn_settle = float(S.get("turn_settle_sec", 0.25))
         self.lost_drags = 0            # drags in a row that didn't turn the camera at all
         self.no_route_since = None
@@ -473,7 +477,32 @@ class DungeonRun:
         self.sweep_i, self.sweep_since = 0, None
 
     # ---------------- helpers ----------------
+    @staticmethod
+    def _kind(msg):
+        if msg.startswith("turning the camera"):
+            return "turning"
+        if msg.startswith(("enemies left", "clearing")):
+            return "fighting"
+        if msg.startswith(("lining up", "walking to the door's line")):
+            return "lining up"
+        if msg.startswith(("going through", "walking into")):
+            return "walking"
+        if msg.startswith(("stuck", "door ")):
+            return "stuck"
+        if "whole map" in msg:
+            return "map"
+        return "other"
+
+    def time_summary(self):
+        t = self.time_in
+        return " · ".join(f"{k} {v:.0f}s" for k, v in sorted(t.items(), key=lambda kv: -kv[1]) if v >= 1)
+
     def say(self, msg):
+        now = self.env.now()
+        if self._say_t is not None:
+            k = self._kind(self.last_status or "")
+            self.time_in[k] = self.time_in.get(k, 0.0) + (now - self._say_t[0])
+        self._say_t = (now,)
         if msg != self.last_status:
             self.last_status = msg
             self.env.status(msg)
@@ -753,7 +782,20 @@ class DungeonRun:
         self.door_fail[edge] = n
         if edge is None:
             e.tap("space", 80)
-            # no door to aim for: just jump
+            # no door to aim for (stuck on the way to the middle of the room): jump, and every
+            # second time also step sideways (laptop 10-20 13:34: only jumped, 9 times in a
+            # doorway, until Spawn)
+            x, y = self.pos()
+            fx, fy = x - path[0][0], y - path[0][1]
+            if n % 2 == 0 and max(abs(fx), abs(fy)) > 0.3:
+                # in a doorway: onto its centre line and a bit further in
+                if abs(fx) >= abs(fy):
+                    tx, ty = fx - math.copysign(0.12, fx), 0.0
+                else:
+                    tx, ty = 0.0, fy - math.copysign(0.12, fy)
+                self.recover_vec, self.recover_until = (tx, ty), now + 0.7
+                self.recover_why = "stuck · jumping and stepping sideways"
+                return
             self.recover_vec, self.recover_until, self.recover_why = (0, 0), now + 0.8, "stuck · jumping"
             return
         dx, dy = path[1][0] - path[0][0], path[1][1] - path[0][1]
@@ -919,8 +961,13 @@ class DungeonRun:
                 self.fight_since = None
             self.mem.spawn_ok = self.spawn_shortcut and now - self.last_spawn > 20 and not fight
             path = self.mem.plan(now)
-            if path is not None:
+            if path is not None and not self.mem.via_unknown:
                 self.no_route_since = None
+            elif path is not None and self.no_route_since is None:
+                self.no_route_since = now          # only through gaps with no door seen
+            if path is not None and self.mem.via_unknown and self.no_route_since is not None \
+                    and now - self.no_route_since > 45 and now - self.last_spawn > 5:
+                path = None                        # 45 s of only that: no way (map over below)
             if path is not None and self.mem.via_spawn:
                 # quicker to press Spawn and walk from the blue room
                 self.stop()
@@ -1027,6 +1074,12 @@ class DungeonRun:
                 what = self.recover_why
             elif gap is not None and not toward_next:
                 vx, vy = (-fx, 0.0) if gap[0] else (0.0, -fy)
+                side = fy if gap[0] else fx
+                if abs(side) > 0.04:
+                    if gap[0]:
+                        vy = -3 * fy
+                    else:
+                        vx = -3 * fx
                 what = "walking into the room"
                 self.entering = (cell, gap)
             elif len(path) == 1:
@@ -1090,14 +1143,19 @@ class DungeonRun:
                 yaw_err = wrap(want - self.head.psi)
                 # look at the door first (doors open while you look at them, and walking
                 # straight with W is the most precise way through a narrow doorway)
-                if face_doors and self.turns_here < 6 and along < 0.42 and (
+                # Blayne's way (10-20): walk on to the door's centre line FIRST, while the camera
+                # still looks the way you came in (so it's a straight walk, not a sidestep), then
+                # turn the camera to the door, then straight through. Lined up = within
+                # lineup_done, or just walked past the line (no stepping back for an overshoot)
+                if not self.lineup and abs(perp) > lineup_start and along < 0.3:
+                    self.lineup = math.copysign(1, perp)
+                if self.lineup and (abs(perp) <= lineup_done or along >= 0.3
+                                    or math.copysign(1, perp) != self.lineup):
+                    self.lineup = False
+                if not self.lineup and face_doors and self.turns_here < 6 and along < 0.42 and (
                         abs(yaw_err) > 0.35 or (abs(yaw_err) > self.turn_retol and self.head.confident)):
                     self.face(want, (path[0], path[1]), min_err=min(0.12, 0.9 * self.turn_retol))
                     continue
-                if not self.lineup and abs(perp) > lineup_start and along < 0.3:
-                    self.lineup = True
-                if self.lineup and (abs(perp) <= lineup_done or along >= 0.3):
-                    self.lineup = False
                 if self.lineup:
                     # step sideways onto the door's centre line (not back to the middle)
                     vx, vy = (0.0, -fy) if nx else (-fx, 0.0)
@@ -1108,12 +1166,12 @@ class DungeonRun:
                         m = math.hypot(vx, vy)
                         if 0 < m < 0.13:
                             vx, vy = vx / m * 0.13, vy / m * 0.13
-                    what = "lining up with the door"
+                    what = "walking to the door's line"
                 else:
                     # straight at the door; small sideways corrections on the way (part-time
                     # diagonal: the more off the centre line, the longer the diagonal key is held)
                     vx, vy = float(nx), float(ny)
-                    duty = 0.0 if abs(perp) < 0.006 else min(1.0, abs(perp) / 0.035)
+                    duty = 0.0 if abs(perp) < 0.03 else min(1.0, (abs(perp) - 0.02) / 0.06)
                     if duty > ((now * 5.0) % 1.0):
                         sx_, sy_ = (0.0, -math.copysign(1, perp)) if nx else (-math.copysign(1, perp), 0.0)
                         vx, vy = vx + sx_, vy + sy_

@@ -432,6 +432,8 @@ def right_drag(px: int, chunk: int = 20, step_ms: float = 12, slow: bool = False
         mouse_button("right", False)
         time.sleep(0.12)
         chunk, step_ms = 12, 18
+    elif abs(px) > 300:
+        chunk = 30        # big turns in bigger steps (each drag is checked on the arrow anyway)
     mouse_button("right", True)
     time.sleep(0.15 if slow else 0.05)
     mouse_rel(1, 0)

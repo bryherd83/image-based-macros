@@ -318,6 +318,10 @@ class Farm:
         mins = (time.monotonic() - t0) / 60
         if finished:
             self.dungeon_saved = None
+            try:
+                g.log(f"dungeon time: {run.time_summary()}")
+            except Exception:
+                pass
             g.log(f"dungeon finished · {run.rooms_cleared} rooms cleared by the macro in {mins:.1f} min "
                   f"({done} cleared, {todo} left on the map)")
             g.shot("dungeon-finished", force=True)
