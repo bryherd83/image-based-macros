@@ -1163,6 +1163,21 @@ class DungeonRun:
                 if self.lineup:
                     # step sideways onto the door's centre line (not back to the middle)
                     vx, vy = (0.0, -fy) if nx else (-fx, 0.0)
+                    if getattr(e, "mount_on", None) and self.mount and S.get("mount_lineup_taps", True):
+                        # on the mount: short taps with a pause after each, so the (slow) laptop
+                        # sees where it stopped before the next one - holding on the fast mount
+                        # shot past the line and back (Blayne 10-20: "tap slower")
+                        k = keys_for(vx, vy, self.head.psi)
+                        if k:
+                            spd = max(self.head.nominal or 0.3, 0.05)
+                            ms = max(35, min(140, 0.6 * abs(perp) / spd * 1000))
+                            self.hold(k)
+                            e.sleep(ms / 1000)
+                            self.stop()
+                            e.sleep(float(S.get("mount_tap_pause_sec", 0.2)))
+                            self.progress_ref = None
+                            self.say("walking to the door's line · " + f"{len(path) - 1} room(s) to go")
+                            continue
                     if S.get("lineup_hold", True):
                         # hold the side key until lined up instead of short taps (taps looked like
                         # stutter steps at every door, Blayne 10-20); the 0.07 / 0.035 margin
