@@ -40,6 +40,10 @@ DEFAULTS = {
     # while the new minimap is being sorted out: a small picture every 2 s during dungeons (the
     # game view + the minimap + what the farm is doing), sent to the PC with the log
     "dungeon_trace": True,
+    # the new minimap's arrow shows where the CAMERA looks (laptop traces 10-19 17:00: every
+    # mouse turn moved it by the same angle, and it stayed put while walking around a room), so
+    # the camera direction is read straight off it instead of being guessed from walking
+    "arrow_is_camera": True,
     "mount_key": "m",
     "sprint_key": "lctrl",
     "trial_sprint": False,             # trials: False = turn sprint off (dungeons always sprint)

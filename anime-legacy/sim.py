@@ -53,6 +53,8 @@ class SimEnv:
                          "face_doors": True, "dungeon_sprint": True,
                          "walk_rooms_per_sec": speed * sprint}   # learned while sprinting
         self.saved = {}
+        # (the real game's new arrow shows the camera; the old one, simulated by default, didn't)
+        self.settings["arrow_is_camera"] = arrow_follows == "camera"
         self.build(n_rooms)
         # fog: the map only shows rooms you've been in and the ones next to them (live: the
         # first look at the whole map shows 2 rooms; more appear as you go)

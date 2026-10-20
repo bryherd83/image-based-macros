@@ -364,6 +364,7 @@ class DungeonRun:
         # the next one sees if that made it faster (if slower, it was already on: press again)
         self.mount = bool(env.settings.get("ride_mount", True)) and hasattr(env, "toggle_mount")
         self.dismount_tried = False
+        self.arrow_cam = bool(env.settings.get("arrow_is_camera", True)) and hasattr(env, "arrow")
         self.dismount_check = None
         # (known to be on already - the game keeps you mounted through teleports - no probe)
         self.mount_probe = self.mount and getattr(env, "mount_on", None) is not True
@@ -474,6 +475,10 @@ class DungeonRun:
             self.head.reset_segment()
         x, y = self.pos()
         self.head.observe(self.env.now(), x, y, self.keys)
+        if self.arrow_cam:
+            a = self.env.arrow()
+            if a is not None:
+                self.head.psi, self.head.confident, self.head.turn_pending = a, True, None
         if self.head.k_changed:
             self.head.k_changed = False
             self.env.save_setting("cam_px_per_rad", round(self.head.k))
@@ -555,6 +560,11 @@ class DungeonRun:
     def measure_heading(self):
         """Step forward and back a little and watch the map (W walks where the camera looks)."""
         self.stop()
+        if self.arrow_cam:
+            a = self.env.arrow()
+            if a is not None:
+                self.head.psi, self.head.confident = a, True
+                return True
         for keys in ({"w"}, {"s"}, {"d"}, {"a"}):
             self.head.reset_segment()
             t0 = self.env.now()
@@ -593,6 +603,27 @@ class DungeonRun:
         self.say(f"turning the camera to face the door ({math.degrees(d):+.0f} deg)")
         self.env.cam_drag(px)
         h.turned_by_mouse(px)
+        if self.arrow_cam and a0 is not None:
+            # check the turn on the arrow (Roblox drops part of a drag at a low frame rate) and
+            # correct it, at most twice; learn the mouse-to-turn ratio from it
+            for i in range(3):
+                self.env.sleep(0.2)
+                a1 = self.env.arrow()
+                if a1 is None:
+                    break
+                turned = wrap(a1 - a0)
+                if i == 0 and abs(d) > 0.6 and abs(turned) > 0.3:
+                    h.learn_from_arrow(px, turned)
+                h.psi, h.confident, h.turn_pending = a1, True, None
+                left = wrap(target - a1)
+                if abs(left) < 0.12 or i == 2:
+                    break
+                a0, px = a1, round(left * h.k)
+                self.env.cam_drag(px)
+            self.last_turn = (edge, self.env.now())
+            self.turns_here += 1
+            self.progress_ref = None        # (turning took a moment: not 'stuck')
+            return
         self.last_turn = (edge, self.env.now())
         self.turns_here += 1
         # does the minimap arrow turn with the camera? (then it tells us the direction for free)
