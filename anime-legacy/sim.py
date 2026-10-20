@@ -297,7 +297,7 @@ class SimEnv:
             self.stats["jumps"] += 1
         self.sleep(ms / 1000)
 
-    def cam_drag(self, px):
+    def cam_drag(self, px, slow=False):
         self.stats["drags"] += 1
         held = self.keys
         self.keys = set()

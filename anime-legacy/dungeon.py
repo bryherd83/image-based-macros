@@ -409,6 +409,8 @@ class DungeonRun:
         self.door_fail = {}            # edge -> attempts
         self.attempt = None            # current door attempt
         self.last_spawn = -1e9
+        self.lost_drags = 0            # drags in a row that didn't turn the camera at all
+        self.no_route_since = None
         self.spawn_shortcut = bool(S.get("spawn_shortcut", True))   # press Spawn when quicker
         self.last_progress_t = env.now()
         self.progress_ref = None
@@ -652,6 +654,16 @@ class DungeonRun:
             return True
         return self.head.psi is not None
 
+    def _drag(self, px):
+        """A camera drag; the careful kind after one that didn't turn the camera at all."""
+        if self.lost_drags:
+            try:
+                self.env.cam_drag(px, slow=True)
+                return
+            except TypeError:
+                pass
+        self.env.cam_drag(px)
+
     def face(self, target, edge, min_err=0.12):
         """Turn the camera to look along `target` (map angle). One drag, checked while walking."""
         h = self.head
@@ -664,7 +676,7 @@ class DungeonRun:
         a0 = self.env.arrow()
         px = round(d * h.k)
         self.say(f"turning the camera to face the door ({math.degrees(d):+.0f} deg)")
-        self.env.cam_drag(px)
+        self._drag(px)
         h.turned_by_mouse(px)
         if self.arrow_cam and a0 is not None:
             # check the turn on the arrow (Roblox drops part of a drag at a low frame rate) and
@@ -675,6 +687,13 @@ class DungeonRun:
                 if a1 is None:
                     break
                 turned = wrap(a1 - a0)
+                if abs(px) > 100:
+                    if abs(turned) < 0.05:
+                        self.lost_drags += 1
+                        if self.lost_drags == 2:
+                            self.env.log("camera didn't turn on 2 drags in a row · turning more carefully")
+                    else:
+                        self.lost_drags = 0
                 if i == 0 and abs(d) > 0.6 and abs(turned) > 0.3:
                     h.learn_from_arrow(px, turned)
                 h.psi, h.confident, h.turn_pending = a1, True, None
@@ -682,7 +701,7 @@ class DungeonRun:
                 if abs(left) < 0.12 or i == 2:
                     break
                 a0, px = a1, round(left * h.k)
-                self.env.cam_drag(px)
+                self._drag(px)
             self.last_turn = (edge, self.env.now())
             self.turns_here += 1
             self.progress_ref = None        # (turning took a moment: not 'stuck')
@@ -890,6 +909,8 @@ class DungeonRun:
                 self.fight_since = None
             self.mem.spawn_ok = self.spawn_shortcut and now - self.last_spawn > 20 and not fight
             path = self.mem.plan(now)
+            if path is not None:
+                self.no_route_since = None
             if path is not None and self.mem.via_spawn:
                 # quicker to press Spawn and walk from the blue room
                 self.stop()
@@ -921,6 +942,27 @@ class DungeonRun:
                 self.leave_t = None
             if path is None:
                 self.stop()
+                todo_n, _ = self.mem.counts()
+                if self.no_route_since is None:
+                    self.no_route_since = now
+                if todo_n and now - self.no_route_since > 25 and now - self.last_spawn > 5:
+                    # unfinished rooms on the remembered map but no way to them, even after
+                    # looking again: the memory is off (a wrong position earlier). Start the map
+                    # over from spawn, like the restart that fixed it (PC 10-20 07:43 sat 3 min
+                    # with '1 to do', 08:33 with '4 to do')
+                    e.log(f"{todo_n} unfinished room(s) on the map but no way there · "
+                          f"starting the map over from spawn")
+                    old_mem = self.mem
+                    self.mem = Memory()
+                    self.mem.spawn_cost = old_mem.spawn_cost
+                    self.no_route_since = None
+                    self.door_fail = {}
+                    if e.press_spawn():
+                        self.last_spawn = e.now()
+                        e.sleep(1.5)
+                    self.head.reset_segment()
+                    self.scan("new map")
+                    continue
                 if now - last_far > 20 and now - self.last_spawn > 60:
                     last_far = now
                     if e.press_spawn():

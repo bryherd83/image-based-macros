@@ -416,19 +416,28 @@ def click_screen(x: int, y: int, park=None, slow=False):
         move_to(*park)
 
 
-def right_drag(px: int, chunk: int = 20, step_ms: float = 12):
+def right_drag(px: int, chunk: int = 20, step_ms: float = 12, slow: bool = False):
     """Turns the camera: hold the right button and move the mouse sideways. Roblox sometimes
     misses a right-button press followed straight away by movement (the camera then doesn't
     turn), so: press, a tiny nudge, a longer pause, then the turn. At a low frame rate (laptop,
     10-18 night: ~80 stucks per dungeon, camera off by 10-15 deg after turns) Roblox also drops
     the start or end of a fast drag, so the pauses are long enough for a slow frame and the
     moves come in smaller, slower steps."""
+    if slow:
+        # the last drag didn't turn the camera at all (the right press was lost and the mouse
+        # just moved across the screen, PC 10-20 08:32): a separate click first so Roblox
+        # notices the button, then a longer hold before moving, and smaller steps
+        mouse_button("right", True)
+        time.sleep(0.06)
+        mouse_button("right", False)
+        time.sleep(0.12)
+        chunk, step_ms = 12, 18
     mouse_button("right", True)
-    time.sleep(0.05)
+    time.sleep(0.15 if slow else 0.05)
     mouse_rel(1, 0)
     time.sleep(0.04)
     mouse_rel(-1, 0)
-    time.sleep(0.12)
+    time.sleep(0.3 if slow else 0.12)
     steps = max(1, int(np.ceil(abs(px) / chunk)))
     done = 0
     for i in range(1, steps + 1):

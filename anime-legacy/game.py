@@ -384,14 +384,14 @@ class Game:
         if self.active():
             winio.tap(key, ms)
 
-    def cam_drag(self, px):
+    def cam_drag(self, px, slow=False):
         if not self.active() or not self.rect:
             return
         W, H = self.size()
         self.zoom_hover = None
         winio.move_to(*self.to_screen(W // 2, round(H * 0.45)))
         time.sleep(0.04)
-        winio.right_drag(px)
+        winio.right_drag(px, slow=slow)
 
     def zoom(self, d):
         if not self.active():
