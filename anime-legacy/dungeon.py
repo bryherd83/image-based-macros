@@ -1096,6 +1096,13 @@ class DungeonRun:
                 if self.lineup:
                     # step sideways onto the door's centre line (not back to the middle)
                     vx, vy = (0.0, -fy) if nx else (-fx, 0.0)
+                    if S.get("lineup_hold", True):
+                        # hold the side key until lined up instead of short taps (taps looked like
+                        # stutter steps at every door, Blayne 10-20); the 0.07 / 0.035 margin
+                        # keeps it from swinging back
+                        m = math.hypot(vx, vy)
+                        if 0 < m < 0.13:
+                            vx, vy = vx / m * 0.13, vy / m * 0.13
                     what = "lining up with the door"
                 else:
                     # straight at the door; small sideways corrections on the way (part-time
