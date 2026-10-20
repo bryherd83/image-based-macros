@@ -802,6 +802,11 @@ class DungeonRun:
         # far_scan_sec): something unfinished may be closer than the rooms remembered
         far_scan_rooms = int(S.get("far_scan_rooms", 8))     # was 4: 5 looks per dungeon, ~5 s each
         far_scan_sec = float(S.get("far_scan_sec", 60))
+        # lining up with a door (rooms off its centre line): start beyond / done within. Was
+        # 0.05 / 0.018 (~1 px): on the mount it overshot and stepped side to side (laptop 10-20
+        # 12:40); sim with a turning mount 10.5 -> 9.6 min, the same without the mount
+        lineup_start = float(S.get("lineup_start", 0.07))
+        lineup_done = float(S.get("lineup_done", 0.035))
         face_doors = bool(S.get("face_doors", True))
         use_sprint = bool(S.get("dungeon_sprint", True))
         last_hud = 0.0
@@ -1077,9 +1082,9 @@ class DungeonRun:
                         abs(yaw_err) > 0.35 or (abs(yaw_err) > 0.13 and self.head.confident)):
                     self.face(want, (path[0], path[1]))
                     continue
-                if not self.lineup and abs(perp) > 0.05 and along < 0.3:
+                if not self.lineup and abs(perp) > lineup_start and along < 0.3:
                     self.lineup = True
-                if self.lineup and (abs(perp) <= 0.018 or along >= 0.3):
+                if self.lineup and (abs(perp) <= lineup_done or along >= 0.3):
                     self.lineup = False
                 if self.lineup:
                     # step sideways onto the door's centre line (not back to the middle)
