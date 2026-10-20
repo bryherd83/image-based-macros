@@ -47,6 +47,7 @@ class Memory:
         self.skip: dict = {}           # room -> until
         self.anchored = False
         self.via_unknown = False       # the last plan() goes through a gap not known as a door
+        self.absent: dict = {}         # remembered room -> reads in a row it plainly wasn't there
 
     # ---- where you are ----
     def track(self, v: mm.MapView):
@@ -106,6 +107,26 @@ class Memory:
                 continue
             self.rooms[(self.cx + a, self.cy + b)] = c
         self.rooms.setdefault((self.cx, self.cy), mm.HIDDEN)
+        # a remembered room next to yours that the minimap plainly shows isn't there (its whole
+        # tile would be on screen): it came from a wrong position earlier. Forget it and its
+        # doors (PC 10-19 20:12: kept walking south into the room's wall towards a room that
+        # didn't exist, 7 rooms to go that way)
+        R = mm.MAP_R
+        for d in DIRS:
+            k = (self.cx + d[0], self.cy + d[1])
+            if k not in self.rooms or d in v.cells:
+                self.absent.pop(k, None)
+                continue
+            tx, ty = d[0] * v.p - v.offx, d[1] * v.p - v.offy
+            if math.hypot(tx, ty) + 0.75 * v.s > R - 4:
+                continue
+            self.absent[k] = self.absent.get(k, 0) + 1
+            if self.absent[k] >= 3:
+                del self.absent[k]
+                self.rooms.pop(k, None)
+                for g in [g for g in self.doors if k in g]:
+                    self.doors.discard(g)
+                    self.sure.discard(g)
         for (p, q) in v.doors:
             g = ((self.cx + p[0], self.cy + p[1]), (self.cx + q[0], self.cy + q[1]))
             self.doors.add(g)
