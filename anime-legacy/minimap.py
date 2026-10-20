@@ -249,16 +249,14 @@ class MapReader:
                     # farm ran into the wall north of it over and over). Only the tab's own
                     # lavender counts here
                     tab = False
-                if tab or lav_tab:
+                if math.hypot(mx - R, my - R) < max(ARROW_NEAR_MIN, 0.36 * p):
+                    # a gap near your arrow says nothing either way: the arrow can hide its dot
+                    # or look like one (Blayne 10-19: read the doors from the middle of the room,
+                    # not up against a wall). Memory keeps what was read from further away
+                    pass
+                elif tab or lav_tab:
                     doors.add(((a, b), k2))
                     doors.add((k2, (a, b)))
-                elif math.hypot(mx - R, my - R) < 11 + 0.1 * s:
-                    # your arrow sits on this gap and can hide its tab: don't call it a wall
-                    # (Blayne, 10-19: "there is a door but the character is blocking it" - the
-                    # farm then forgot real doors and walked into walls or sat in spawn). Only
-                    # gaps the arrow really covers (it's ~10 px): with the old 16 + 0.3*s every
-                    # wall of your room counted as covered even from its middle (PC 20:09)
-                    pass
                 elif (0, 0) in ((a, b), k2) and k != HIDDEN and cells[k2] != HIDDEN and s >= 20:
                     # your own room: its white outline fills the gap, so 'dark gap' never
                     # happens and its walls stayed 'maybe a door' and were walked into (PC
@@ -279,6 +277,11 @@ class MapReader:
 
 
 # ---------------- The arrow in the middle of the minimap ----------------
+# gaps closer than this (px) to the map centre are left unread: the ~10 px arrow (its tip reaches
+# ~10 px out) plus the strip a door is looked for in. From the middle of a room every side is
+# 0.5 room away (24+ px at the walking zoom), so all four get read there
+# (0.36 of a room: from the middle a side is 0.5 away, so a few px off the middle still reads it)
+ARROW_NEAR_MIN = 14
 # The new UI's white arrow (taken from a screenshot), pointing north, around the map centre.
 # It is the same size at every zoom.
 _ARROW = "1,-7;1,-6;0,-5;1,-5;2,-5;-1,-4;0,-4;1,-4;2,-4;3,-4;-2,-3;-1,-3;0,-3;1,-3;2,-3;3,-3;-2,-2;-1,-2;0,-2;1,-2;2,-2;3,-2;4,-2;-3,-1;-2,-1;-1,-1;0,-1;1,-1;2,-1;3,-1;4,-1;5,-1;-4,0;-3,0;-2,0;-1,0;0,0;1,0;2,0;3,0;4,0;5,0;-4,1;-3,1;-2,1;-1,1;0,1;1,1;2,1;3,1;4,1;5,1;6,1;-5,2;-4,2;-3,2;-2,2;-1,2;0,2;1,2;2,2;3,2;4,2;5,2;6,2;-2,3;-1,3;0,3;1,3;2,3;3,3;4,3;5,3;6,3;-1,4;0,4;1,4;2,4;-1,5;0,5;1,5;2,5;-1,6;0,6;1,6;2,6;-1,7;0,7;1,7;2,7;-1,8;0,8;1,8;2,8;1,9;2,9"

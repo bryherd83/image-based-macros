@@ -26,9 +26,14 @@ CASES = [
     # standing at the south wall (no door there, the arrow covers it): your own room's walls
     # left and right must read as walls, the door north as a door (PC 20:09 ran into the wall)
     # the blue spawn room south: its top highlight is not a door (PC 20:23 ran into that wall)
-    ("spawnedge-54", 90, {(0, 1): SP}, [((0, -1), (0, 0)), ((0, 0), (1, 0))], [((0, 0), (0, 1))]),
+    ("spawnedge-54", 90, {(0, 1): SP}, [((0, -1), (0, 0)), ((0, 0), (1, 0))], []),
     ("fakedoor-50", 90, {}, [((0, -1), (0, 0))], [((-1, 0), (0, 0)), ((0, 0), (1, 0))]),
 ]
+# gaps right next to your arrow are not read either way (read from the middle of the room)
+for name, edge in (("spawnedge-54", ((0, 0), (0, 1))), ("fakedoor-50", ((0, 0), (0, 1)))):
+    f = cv2.imread(S % name)
+    v = mm.MapReader().parse(hud.minimap_crop(f))
+    assert edge not in v.doors and edge not in v.walls, (name, edge)
 for name, deg, cells, doors, walls in CASES:
     f = cv2.imread(S % name)
     assert hud.has_minimap(f), name
