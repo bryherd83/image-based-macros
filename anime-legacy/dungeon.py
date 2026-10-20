@@ -954,9 +954,13 @@ class DungeonRun:
             # standing in a doorway (just came through it)? walk straight into the room first:
             # moving sideways in there only scrapes the doorway's walls
             gap = None
-            if abs(fx) > 0.36 and abs(fx) >= abs(fy):
+            # once walking in from a doorway, keep at it until well inside (0.22): switching at
+            # one line flipped between 'straight in' and 'to the middle' (a sideways key) every
+            # few frames - a stutter step at the first door (PC 10-19 22:01)
+            edge_in = 0.22 if getattr(self, "entering", None) == cell else 0.36
+            if abs(fx) > edge_in and abs(fx) >= abs(fy):
                 gap = (1 if fx > 0 else -1, 0)
-            elif abs(fy) > 0.36:
+            elif abs(fy) > edge_in:
                 gap = (0, 1 if fy > 0 else -1)
             toward_next = len(path) > 1 and gap == (path[1][0] - cell[0], path[1][1] - cell[1])
             if now < self.recover_until:
@@ -965,7 +969,9 @@ class DungeonRun:
             elif gap is not None and not toward_next:
                 vx, vy = (-fx, 0.0) if gap[0] else (0.0, -fy)
                 what = "walking into the room"
+                self.entering = cell
             elif len(path) == 1:
+                self.entering = None
                 # ---- in the room to clear: stand in the middle; if it doesn't clear, walk a square
                 if self.clear_key != cell:
                     self.clear_key, self.clear_t = cell, now
