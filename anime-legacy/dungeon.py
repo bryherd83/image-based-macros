@@ -1152,7 +1152,10 @@ class DungeonRun:
                 if med >= 0.78 * self.sprint_ref:
                     self.sprint_taps.clear()
             return
-        if not self.mount_probe and med >= 0.82 * ref:
+        # walking is ~0.3 of mount speed (mount 3.5x): only that slow means 'off the mount'.
+        # Lining up at doors on the mount reads ~0.75 (PC 10-19 21:33 / 21:36: was 0.82, so it
+        # pressed M, got off and walked until the next check got it back on)
+        if not self.mount_probe and med >= float(self.S.get("mount_off_below", 0.5)) * ref:
             e.mount_on = True
             if med >= 0.92 * ref:                # on the mount: keep its speed up to date
                 self.sprint_ref = med if med > 1.25 * ref else 0.9 * ref + 0.1 * med
