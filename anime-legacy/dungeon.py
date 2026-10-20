@@ -1004,11 +1004,18 @@ class DungeonRun:
             # once walking in from a doorway, keep at it until well inside (0.22): switching at
             # one line flipped between 'straight in' and 'to the middle' (a sideways key) every
             # few frames - a stutter step at the first door (PC 10-19 22:01)
-            edge_in = 0.22 if getattr(self, "entering", None) == cell else 0.36
-            if abs(fx) > edge_in and abs(fx) >= abs(fy):
+            # Only while still walking in (and only in a doorway: near the middle of a side, not
+            # anywhere along a wall). The 0.22 used to stay on for the whole room and near any
+            # wall, so 'walking into the room' and 'lining up with the door' took turns pushing
+            # the player back and forth (laptop 10-20 12:40-12:48, 63 flips in 15 min)
+            ent = getattr(self, "entering", None)
+            edge_in = 0.22 if ent is not None and ent[0] == cell else 0.36
+            if abs(fx) > edge_in and abs(fx) >= abs(fy) and abs(fy) < 0.2:
                 gap = (1 if fx > 0 else -1, 0)
-            elif abs(fy) > edge_in:
+            elif abs(fy) > edge_in and abs(fx) < 0.2:
                 gap = (0, 1 if fy > 0 else -1)
+            if ent is not None and (ent[0] != cell or gap != ent[1]):
+                self.entering = ent = None
             toward_next = len(path) > 1 and gap == (path[1][0] - cell[0], path[1][1] - cell[1])
             if now < self.recover_until:
                 vx, vy = self.recover_vec[0] - fx, self.recover_vec[1] - fy
@@ -1016,7 +1023,7 @@ class DungeonRun:
             elif gap is not None and not toward_next:
                 vx, vy = (-fx, 0.0) if gap[0] else (0.0, -fy)
                 what = "walking into the room"
-                self.entering = cell
+                self.entering = (cell, gap)
             elif len(path) == 1:
                 self.entering = None
                 # ---- in the room to clear: stand in the middle; if it doesn't clear, walk a square
