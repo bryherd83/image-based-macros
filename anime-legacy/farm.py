@@ -218,6 +218,9 @@ class Farm:
                 g.log(f"joining the {pop.kind}")
                 g.shot(f"joining-{pop.kind}", force=True)
                 self.last_join = dt.datetime.now()
+                # stop setting up Defense: its Play button was still on screen and got pressed
+                # while the dungeon loaded, which took you to Defense instead (PC 10-19 15:31)
+                culling.joined_popup()
                 off = popup_offset(self.last_join)
                 if off is not None:                 # learn this PC's clock (see culling.py)
                     # a popup can be joined late (still busy), never early: a lower value counts

@@ -137,6 +137,38 @@ c = run(g, dt.datetime(2026, 10, 17, 17, 1, 0), ticks=400)
 tries = sum(1 for m in g.lines if m == "opened Defense")
 print("3:", g.state, f"{tries} tries in {g.t:.0f}s", [m for m in g.lines if "couldn't" in m])
 assert g.state != "defense" and tries <= 6 and sum("couldn't open it 4 times" in m for m in g.lines) == 1
+# 4. a dungeon popup comes up while setting up Defense (Play on screen): Play isn't pressed, and
+#    once the popup is joined nothing more is clicked while it loads (PC 10-19 15:31: Play was
+#    pressed after joining and it went to Defense instead of the dungeon)
+g = FakeGame()
+g.popup_up = False
+g.popup = lambda: (1, 1) if g.popup_up else None
+c = culling.Culling(g)
+real = culling.dt.datetime
+clock = dt.datetime(2026, 10, 17, 17, 5, 0)
+class Clock(real):
+    @classmethod
+    def now(cls, tz=None):
+        return clock + dt.timedelta(seconds=g.t)
+culling.dt.datetime = Clock
+try:
+    for _ in range(60):
+        if g.state == "started":
+            break
+        c.defense_tick(g); g.t += 0.5
+    assert g.state == "started", g.state
+    g.popup_up = True
+    for _ in range(6):
+        c.defense_tick(g); g.t += 0.5
+    assert g.state == "started", "pressed Play over the popup"
+    c.joined_popup(); g.popup_up = False
+    n = len(g.clicks)
+    for _ in range(40):
+        c.defense_tick(g); g.t += 0.5
+    assert len(g.clicks) == n and g.state == "started", (g.clicks[n:], g.state)
+finally:
+    culling.dt.datetime = real
+print("4: popup during setup -> Play left alone, hands off after joining")
 print("defense: ok")
 
 # 4. the real farm tick on the laptop's Defense screenshot (wave 12/50): reads the wave, presses

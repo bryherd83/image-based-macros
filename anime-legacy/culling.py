@@ -155,6 +155,13 @@ class Culling:
         self.open_culling(f)
 
     # ---- Defense in between dungeons and trials (the game plays Defense by itself) ----
+    def joined_popup(self):
+        """A Dungeon / Trial popup was just joined: drop any Defense setup under way and keep
+        hands off while it loads."""
+        self.last_nav = 0
+        self.nav_clicks = {}
+        self.hold_until = self.env.now() + float(self.env.settings.get("after_join_hold_sec", 25))
+
     def defense_tick(self, f):
         """Mode 'defense', not in a run: open Defense (Worlds menu -> Dragon City's key ->
         Create -> Play) unless a Dungeon / Trial popup is due soon. Dungeons and trials are
@@ -167,8 +174,14 @@ class Culling:
         kind, t = next_popup(("dungeon", "trial") if S.get("join_trials") else ("dungeon",),
                              offset=float(S.get("popup_offset_sec", DEFAULT_OFFSET)))
         due_in = (t - dt.datetime.now()).total_seconds()
+        if now < getattr(self, "hold_until", 0):
+            e.status("joined a popup · waiting for it to load")
+            return
         just_started = self.last_start and now - self.last_start < 45
         navigating = self.last_nav and now - self.last_nav < 15
+        popup = getattr(e, "popup", None)
+        if navigating and popup and popup() is not None:
+            return                                # a popup is up: it gets joined, not Defense
         if not just_started and navigating:
             for name, msg in (("play", "pressed Play"), ("create", "pressed Create"), ("key", "opened Defense")):
                 c = e.find(name, f)
