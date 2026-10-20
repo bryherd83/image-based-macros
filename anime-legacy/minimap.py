@@ -248,28 +248,33 @@ _ARROW_PTS = np.array([[int(v) for v in p.split(",")] for p in _ARROW.split(";")
 
 
 def _arrow_tables():
-    pts = _ARROW_PTS
-    dark = []
-    for x in range(-12, 13):
-        for y in range(-12, 13):
-            if x * x + y * y > 144:
-                continue
-            if np.any((np.abs(pts[:, 0] - x) <= 1) & (np.abs(pts[:, 1] - y) <= 1)):
-                continue
-            dark.append((x, y))
-    dark = np.array(dark)
-    R, N = 20, 41
+    """For each of 120 turns (3 deg apart) and each small shift: where the arrow's white pixels
+    would be, and the ring of pixels around it that should not be white. The arrow is turned
+    about its own centre and allowed to sit up to 4 px off the map centre: turning it about the
+    map centre left diagonal arrows off by a few pixels, and those read 90-100 deg wrong
+    (PC 10-19 20:02: up-right read as down-right, so the camera was 'corrected' back and forth
+    and the player spun in circles)."""
+    pts = _ARROW_PTS.astype(float)
+    pts = pts - pts.mean(axis=0)
+    N, R, S = 41, 20, 4
+    W = N + 2 * S                                   # the crop is padded by S on every side
+    yy, xx = np.mgrid[-12:13, -12:13]
+    disc = np.stack([xx[xx ** 2 + yy ** 2 <= 121], yy[xx ** 2 + yy ** 2 <= 121]], axis=1)
+    shifts = np.array([(dx, dy) for dy in range(-S, S + 1) for dx in range(-S, S + 1)])
+    sh = (shifts[:, 1] * W + shifts[:, 0])[:, None]
     tabs = []
     for k in range(120):
         th = math.radians(k * 3)
         cs, sn = math.cos(th), math.sin(th)
-        out = []
-        for P in (pts, dark):
-            X = np.rint(P[:, 0] * cs - P[:, 1] * sn).astype(int) + R
-            Y = np.rint(P[:, 0] * sn + P[:, 1] * cs).astype(int) + R
-            ok = (X >= 0) & (Y >= 0) & (X < N) & (Y < N)
-            out.append((Y[ok] * N + X[ok], len(P)))
-        tabs.append(out)
+        X = np.rint(pts[:, 0] * cs - pts[:, 1] * sn).astype(int)
+        Y = np.rint(pts[:, 0] * sn + pts[:, 1] * cs).astype(int)
+        on = set(zip(X.tolist(), Y.tolist()))
+        near = {(x + i, y + j) for x, y in on for i in (-1, 0, 1) for j in (-1, 0, 1)}
+        ring = np.array([(x, y) for x, y in disc.tolist() if (x, y) not in near])
+        onp = np.array(sorted(on))
+        ip = (onp[:, 1] + R + S) * W + onp[:, 0] + R + S
+        ir = (ring[:, 1] + R + S) * W + ring[:, 0] + R + S
+        tabs.append((ip[None, :] + sh, ir[None, :] + sh))
     return tabs
 
 
@@ -279,20 +284,24 @@ _ARROW_TABS = None
 def read_arrow(bgr41: np.ndarray):
     """Direction the arrow points, in radians (0 = east, +pi/2 = south), or None.
     bgr41: 41x41 crop centred on the minimap centre. (At the widest zoom other white bits -
-    your room's outline, door tabs - lie around it; the dark-ring penalty is kept mild.)"""
+    your room's outline, door tabs - lie around it.)"""
     global _ARROW_TABS
     if _ARROW_TABS is None:
         _ARROW_TABS = _arrow_tables()
-    wm = (bgr41.min(axis=2) > 235).ravel()
+    if bgr41 is None or bgr41.shape[0] != 41 or bgr41.shape[1] != 41:
+        return None
+    wm = np.pad(bgr41.min(axis=2) > 235, 4).ravel().astype(np.float32)
     best, best_k = -9.0, 0
-    for k, ((ip, nT), (idk, nD)) in enumerate(_ARROW_TABS):
-        sc = wm[ip].sum() / nT - 0.5 * wm[idk].sum() / nD
-        if sc > best:
-            best, best_k = sc, k
+    for k, (ip, ir) in enumerate(_ARROW_TABS):
+        hit = wm[ip].mean(axis=1)
+        sc = hit - wm[ir].mean(axis=1)
+        sc[hit < 0.6] = -9.0
+        j = int(sc.argmax())
+        if sc[j] > best:
+            best, best_k = float(sc[j]), k
     if best < 0.6:
         return None
     return wrap(math.radians(best_k * 3 - 90))
-
 
 def wrap(a: float) -> float:
     return (a + math.pi) % (2 * math.pi) - math.pi

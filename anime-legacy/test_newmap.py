@@ -21,6 +21,8 @@ CASES = [
     ("dg-34", 0, {(1, 0): TR, (0, 0): C}, [((0, 0), (1, 0))], []),
     ("dg-35", 0, {(0, 0): G, (1, 0): G, (-1, 0): C}, [((-1, 0), (0, 0)), ((0, 0), (1, 0))], [((-2, 0), (-1, 0))]),
     ("dg-37", 70, {}, [], []),
+    # up-right arrow: read as down-right (+57) before the arrow was turned about its own centre
+    ("arrow-diag", -40, {}, [], []),
 ]
 for name, deg, cells, doors, walls in CASES:
     f = cv2.imread(S % name)
