@@ -1149,7 +1149,11 @@ class DungeonRun:
                 # lineup_done, or just walked past the line (no stepping back for an overshoot)
                 if not self.lineup and abs(perp) > lineup_start and along < 0.3:
                     self.lineup = math.copysign(1, perp)
-                if self.lineup and (abs(perp) <= lineup_done or along >= 0.3
+                # let go early by how far you still slide after letting go (fast on the mount,
+                # and the laptop sees the map late): stop_lead_sec of the current speed
+                spd_now = self.head.nominal or float(S.get("walk_rooms_per_sec", 0.27))
+                done_at = max(lineup_done, spd_now * float(S.get("stop_lead_sec", 0.12)))
+                if self.lineup and (abs(perp) <= done_at or along >= 0.3
                                     or math.copysign(1, perp) != self.lineup):
                     self.lineup = False
                 if not self.lineup and face_doors and self.turns_here < 6 and along < 0.42 and (
