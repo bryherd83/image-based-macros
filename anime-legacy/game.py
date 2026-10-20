@@ -37,6 +37,8 @@ DEFAULTS = {
     # dungeons: ride the mount (moves like running, only faster - Blayne). F5 has a box. (The
     # circles on 10-19 15:32 came from a wall next to your room read as a door, not the mount.)
     "ride_mount": True,
+    "spawn_shortcut": True,             # press Spawn when walking from the blue room is quicker
+    "spawn_shortcut_rooms": 3.0,        # what pressing Spawn costs, in rooms of walking
     # while the new minimap is being sorted out: a small picture every 2 s during dungeons (the
     # game view + the minimap + what the farm is doing), sent to the PC with the log
     "dungeon_trace": True,

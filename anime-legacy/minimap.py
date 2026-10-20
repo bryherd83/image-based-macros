@@ -234,8 +234,14 @@ class MapReader:
                         sl = door[max(0, round(my - hg - 2)):round(my + hg + 2) + 1,
                                   max(0, round(mx + lo * s)):max(0, round(mx + hi * s)) + 1]
                     lavs.append(int(sl.sum()))
+                    if lo == -0.2:
+                        # how thick the lavender is across the gap: a tab spans the gap; the blue
+                        # spawn room's top highlight is a 1 px line that classes as lavender too
+                        # (PC 10-19 20:23: read as a door north of spawn, ran into the wall)
+                        thick = int((sl.any(axis=0) if g[0] else sl.any(axis=1)).sum())
                 lm, l1, l2 = lavs
-                lav_tab = lm >= (3 if s >= 20 else 2) and l1 <= 0.4 * lm and l2 <= 0.4 * lm
+                lav_tab = lm >= (3 if s >= 20 else 2) and l1 <= 0.4 * lm and l2 <= 0.4 * lm \
+                    and (thick >= 2 or s < 20)
                 tab = nm >= 2 and mid >= 0.35 and (n1 == 0 or e1 < 0.6 * mid) and (n2 == 0 or e2 < 0.6 * mid)
                 if (0, 0) in ((a, b), k2):
                     # your room's white outline lies in these gaps (and its rounded corners

@@ -47,6 +47,8 @@ class Memory:
         self.skip: dict = {}           # room -> until
         self.anchored = False
         self.via_unknown = False       # the last plan() goes through a gap not known as a door
+        self.via_spawn = False         # the last plan() starts by pressing Spawn
+        self.plan_cost = 0.0
         self.absent: dict = {}         # remembered room -> reads in a row it plainly wasn't there
 
     # ---- where you are ----
@@ -161,10 +163,12 @@ class Memory:
         return self.skip.get(r, 0) > now
 
     def plan(self, now):
-        """Shortest route through known doors to the nearest unfinished room: a list of rooms
-        starting with yours, or None. With no such route, one that also uses gaps not seen as
-        walls (tiny door tabs on the zoomed-out map are easy to miss: laptop 10-19 16:35, 7
-        rooms left and no known way to them, so it sat in spawn)."""
+        """Quickest route to an unfinished room: a list of rooms starting with yours, or None.
+        Cost = rooms walked + TURN_COST per change of direction (each turn stops to swing the
+        camera), and a route may start with pressing Spawn (to the blue room) when that is
+        quicker (Blayne 10-19: from far away it walked the long way round; self.via_spawn).
+        With no route through known doors, one that also uses gaps not seen as walls (tiny door
+        tabs on the zoomed-out map are easy to miss: laptop 10-19 16:35; self.via_unknown)."""
         p = self._plan(now, False)
         self.via_unknown = False
         if p is None:
@@ -172,29 +176,59 @@ class Memory:
             self.via_unknown = p is not None
         return p
 
+    TURN_COST = 0.6
+    spawn_cost = 3.0               # pressing Spawn = about this many rooms of walking
+    spawn_ok = True                # the farm switches this off for a while after using it
+
     def _plan(self, now, unknown_ok):
+        import heapq
         start = (self.cx, self.cy)
+        self.via_spawn = False
+        self.plan_cost = 0.0
         if self.rooms.get(start) in TODO_KINDS and not self.skipped(start, now):
             return [start]
-        prev = {start: None}
-        q = deque([start])
-        while q:
-            n = q.popleft()
+        # state = (room, direction came in); 'S' marks the start from the spawn room
+        heads = [(0.0, 0, start, None, False)]
+        sp = (0, 0)
+        if self.spawn_ok and self.anchored and sp != start and self.rooms.get(sp) == mm.SPAWN:
+            heads.append((self.spawn_cost, 1, sp, None, True))
+        best = {}
+        prev = {}
+        prev_cost = {}
+        heapq.heapify(heads)
+        tie = 2
+        while heads:
+            c, _, n, din, via = heapq.heappop(heads)
+            key = (n, din, via)
+            if key in best:
+                continue
+            best[key] = c
+            if self.rooms.get(n) in TODO_KINDS and not self.skipped(n, now) and n != start:
+                path = [n]
+                k = key
+                while k in prev:
+                    k = prev[k]
+                    path.insert(0, k[0])
+                self.via_spawn = via
+                self.plan_cost = c
+                return path
             for d in DIRS:
-                k = (n[0] + d[0], n[1] + d[1])
-                if k in prev or k not in self.rooms:
+                k2 = (n[0] + d[0], n[1] + d[1])
+                if k2 not in self.rooms:
                     continue
-                if (n, k) not in self.doors and (not unknown_ok or (n, k) in self.walls):
+                if (n, k2) not in self.doors and (not unknown_ok or (n, k2) in self.walls):
                     continue
-                if self.is_blocked(n, k, now):
+                if self.is_blocked(n, k2, now):
                     continue
-                prev[k] = n
-                if self.rooms[k] in TODO_KINDS and not self.skipped(k, now):
-                    path = [k]
-                    while prev[path[0]] is not None:
-                        path.insert(0, prev[path[0]])
-                    return path
-                q.append(k)
+                nk = (k2, d, via)
+                if nk in best:
+                    continue
+                nc = c + 1.0 + (self.TURN_COST if din is not None and d != din else 0.0)
+                if nk not in prev or nc < prev_cost.get(nk, 1e9):
+                    prev[nk] = key
+                    prev_cost[nk] = nc
+                    heapq.heappush(heads, (nc, tie, k2, d, via))
+                    tie += 1
         return None
 
     def counts(self):
@@ -359,6 +393,7 @@ class DungeonRun:
         S = env.settings
         self.S = S
         self.mem = resume_from.mem if resume_from else Memory()
+        self.mem.spawn_cost = float(S.get("spawn_shortcut_rooms", 3.0))
         self.head = resume_from.head if resume_from else Heading(
             float(S.get("cam_px_per_rad", 584)), env.log, float(S.get("walk_rooms_per_sec", 0.27)))
         if resume_from:
@@ -374,6 +409,7 @@ class DungeonRun:
         self.door_fail = {}            # edge -> attempts
         self.attempt = None            # current door attempt
         self.last_spawn = -1e9
+        self.spawn_shortcut = bool(S.get("spawn_shortcut", True))   # press Spawn when quicker
         self.last_progress_t = env.now()
         self.progress_ref = None
         self.recover_until = 0
@@ -852,7 +888,24 @@ class DungeonRun:
                 self.fight_since = now
             elif not fight:
                 self.fight_since = None
+            self.mem.spawn_ok = self.spawn_shortcut and now - self.last_spawn > 20 and not fight
             path = self.mem.plan(now)
+            if path is not None and self.mem.via_spawn:
+                # quicker to press Spawn and walk from the blue room
+                self.stop()
+                if e.press_spawn():
+                    e.log(f"pressed Spawn · the next room is quicker from there "
+                          f"({len(path) - 1} room(s) from spawn)")
+                    self.last_spawn = e.now()
+                    self.mem.forget_offset()
+                    self.mem.cx, self.mem.cy = 0, 0
+                    self.head.reset_segment()
+                    self.recover_until = 0
+                    e.sleep(0.5)
+                    continue
+                self.last_spawn = now          # no Spawn button: don't try again for a while
+                self.mem.spawn_ok = False
+                path = self.mem.plan(now)
             # nothing unfinished known (or only far away): look at the whole map
             if not fight and ((path is None and now - self.last_scan > 15)
                               or (path is not None and len(path) > far_scan_rooms

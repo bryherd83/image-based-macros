@@ -25,6 +25,8 @@ CASES = [
     ("arrow-diag", -40, {}, [], []),
     # standing at the south wall (no door there, the arrow covers it): your own room's walls
     # left and right must read as walls, the door north as a door (PC 20:09 ran into the wall)
+    # the blue spawn room south: its top highlight is not a door (PC 20:23 ran into that wall)
+    ("spawnedge-54", 90, {(0, 1): SP}, [((0, -1), (0, 0)), ((0, 0), (1, 0))], [((0, 0), (0, 1))]),
     ("fakedoor-50", 90, {}, [((0, -1), (0, 0))], [((-1, 0), (0, 0)), ((0, 0), (1, 0))]),
 ]
 for name, deg, cells, doors, walls in CASES:
