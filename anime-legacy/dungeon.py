@@ -46,6 +46,7 @@ class Memory:
         self.blocked: dict = {}        # edge -> until (time)
         self.skip: dict = {}           # room -> until
         self.anchored = False
+        self.via_unknown = False       # the last plan() goes through a gap not known as a door
 
     # ---- where you are ----
     def track(self, v: mm.MapView):
@@ -143,7 +144,12 @@ class Memory:
         starting with yours, or None. With no such route, one that also uses gaps not seen as
         walls (tiny door tabs on the zoomed-out map are easy to miss: laptop 10-19 16:35, 7
         rooms left and no known way to them, so it sat in spawn)."""
-        return self._plan(now, False) or self._plan(now, True)
+        p = self._plan(now, False)
+        self.via_unknown = False
+        if p is None:
+            p = self._plan(now, True)
+            self.via_unknown = p is not None
+        return p
 
     def _plan(self, now, unknown_ok):
         start = (self.cx, self.cy)
@@ -856,6 +862,19 @@ class DungeonRun:
                 continue
             x, y = self.pos()
             fx, fy = x - cell[0], y - cell[1]               # position inside this room (rooms)
+            if self.mem.via_unknown and not fighting_here and len(path) > 1 \
+                    and (cell, path[1]) not in self.mem.doors and now >= self.recover_until:
+                # the only way on is a gap with no door seen in it (PC 10-19 20:09: the arrow
+                # covered the wall south of the room, so it counted as maybe a door and the farm
+                # kept running into it). Like Blayne would: look at the whole map first, then
+                # stand in the middle of the room (the arrow can't cover a door from there) and
+                # read the doors again
+                if now - self.last_scan > 15:
+                    self.scan("no door seen to the next room")
+                    continue
+                if math.hypot(fx, fy) > 0.15:
+                    self.recover_vec, self.recover_until = (0.0, 0.0), now + 0.6
+                    self.recover_why = "no door seen there · checking from the middle of the room"
             lat_tol = 0.0
             tol = 0.0
             # standing in a doorway (just came through it)? walk straight into the room first:

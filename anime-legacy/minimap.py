@@ -190,6 +190,24 @@ class MapReader:
             t = int(ok.sum())
             return (float((light[ya:yb + 1, xa:xb + 1] & ok).sum()) / t if t else 0.0), t
 
+        lt = (bi.min(axis=2) > 185) & inside
+
+        def own_tab(mx, my, g):
+            # light pixels across the gap (+-4 px, a 5 px wide strip) in the middle of the side,
+            # minus the same next to the corners (0.3 of a room either way)
+            def strip(lat):
+                tot = 0
+                for t in range(-4, 5):
+                    x = round(mx + g[0] * t + g[1] * lat)
+                    y = round(my + g[1] * t + g[0] * lat)
+                    if g[0]:
+                        seg = lt[max(0, y - 2):y + 3, x] if 0 <= x < N else lt[0:0, 0]
+                    else:
+                        seg = lt[y, max(0, x - 2):x + 3] if 0 <= y < N else lt[0, 0:0]
+                    tot += int(seg.sum())
+                return tot
+            return strip(0) - max(strip(-0.3 * s), strip(0.3 * s))
+
         for (a, b), k in cells.items():
             for g in ((1, 0), (0, 1)):
                 k2 = (a + g[0], b + g[1])
@@ -228,11 +246,25 @@ class MapReader:
                 if tab or lav_tab:
                     doors.add(((a, b), k2))
                     doors.add((k2, (a, b)))
-                elif math.hypot(mx - R, my - R) < 16 + 0.3 * s:
+                elif math.hypot(mx - R, my - R) < 11 + 0.1 * s:
                     # your arrow sits on this gap and can hide its tab: don't call it a wall
                     # (Blayne, 10-19: "there is a door but the character is blocking it" - the
-                    # farm then forgot real doors and walked into walls or sat in spawn)
+                    # farm then forgot real doors and walked into walls or sat in spawn). Only
+                    # gaps the arrow really covers (it's ~10 px): with the old 16 + 0.3*s every
+                    # wall of your room counted as covered even from its middle (PC 20:09)
                     pass
+                elif (0, 0) in ((a, b), k2) and k != HIDDEN and cells[k2] != HIDDEN and s >= 20:
+                    # your own room: its white outline fills the gap, so 'dark gap' never
+                    # happens and its walls stayed 'maybe a door' and were walked into (PC
+                    # 20:09). Across the gap, a tab is light much further than the thin outline
+                    # is (the outline looks the same in the middle of the side as near a corner)
+                    ext = own_tab(mx, my, g)
+                    if ext >= 12:
+                        doors.add(((a, b), k2))
+                        doors.add((k2, (a, b)))
+                    elif ext <= 3:
+                        walls.add(((a, b), k2))
+                        walls.add((k2, (a, b)))
                 elif k != HIDDEN and cells[k2] != HIDDEN and nm >= 2 and mid < 0.1:
                     walls.add(((a, b), k2))
                     walls.add((k2, (a, b)))

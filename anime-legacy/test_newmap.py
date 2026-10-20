@@ -23,6 +23,9 @@ CASES = [
     ("dg-37", 70, {}, [], []),
     # up-right arrow: read as down-right (+57) before the arrow was turned about its own centre
     ("arrow-diag", -40, {}, [], []),
+    # standing at the south wall (no door there, the arrow covers it): your own room's walls
+    # left and right must read as walls, the door north as a door (PC 20:09 ran into the wall)
+    ("fakedoor-50", 90, {}, [((0, -1), (0, 0))], [((-1, 0), (0, 0)), ((0, 0), (1, 0))]),
 ]
 for name, deg, cells, doors, walls in CASES:
     f = cv2.imread(S % name)
