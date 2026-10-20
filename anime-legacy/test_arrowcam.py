@@ -9,8 +9,9 @@ sys.path.insert(0, HERE)
 import sim  # noqa: E402
 import dungeon  # noqa: E402
 
-for kw in ({"drag_fail": 0.5}, {"drag_fail": 0.5, "mount": 2.4}, {"k_true": 750.0}):
-    for seed in (1, 2):
+for kw in ({"drag_fail": 0.5}, {"drag_fail": 0.5, "mount": 2.4}, {"k_true": 750.0}, {"drag_fail": 0.25}):
+    # (drag_fail 0.25 seed 3: re-aiming at a door below face()'s own minimum turn looped for ever)
+    for seed in ((1, 2, 3) if kw == {"drag_fail": 0.25} else (1, 2)):
         env = sim.SimEnv(seed=seed, arrow_follows="camera", **kw)
         lines = []
         env.log = lambda m, *a, **k: lines.append(m)

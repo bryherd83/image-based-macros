@@ -409,6 +409,11 @@ class DungeonRun:
         self.door_fail = {}            # edge -> attempts
         self.attempt = None            # current door attempt
         self.last_spawn = -1e9
+        # camera turns: done within turn_tol (rad), re-aimed at a door past turn_retol. Were 0.12 /
+        # 0.13 (7 deg): the camera ended a few degrees off after most turns (Blayne 10-20)
+        self.turn_tol = float(S.get("turn_tol", 0.05))
+        self.turn_retol = float(S.get("turn_retol", 0.08))
+        self.turn_settle = float(S.get("turn_settle_sec", 0.25))
         self.lost_drags = 0            # drags in a row that didn't turn the camera at all
         self.no_route_since = None
         self.spawn_shortcut = bool(S.get("spawn_shortcut", True))   # press Spawn when quicker
@@ -682,7 +687,7 @@ class DungeonRun:
             # check the turn on the arrow (Roblox drops part of a drag at a low frame rate) and
             # correct it, at most twice; learn the mouse-to-turn ratio from it
             for i in range(3):
-                self.env.sleep(0.2)
+                self.env.sleep(self.turn_settle)
                 a1 = self.env.arrow()
                 if a1 is None:
                     break
@@ -698,7 +703,7 @@ class DungeonRun:
                     h.learn_from_arrow(px, turned)
                 h.psi, h.confident, h.turn_pending = a1, True, None
                 left = wrap(target - a1)
-                if abs(left) < 0.12 or i == 2:
+                if abs(left) < self.turn_tol or i == 2:
                     break
                 a0, px = a1, round(left * h.k)
                 self._drag(px)
@@ -1086,8 +1091,8 @@ class DungeonRun:
                 # look at the door first (doors open while you look at them, and walking
                 # straight with W is the most precise way through a narrow doorway)
                 if face_doors and self.turns_here < 6 and along < 0.42 and (
-                        abs(yaw_err) > 0.35 or (abs(yaw_err) > 0.13 and self.head.confident)):
-                    self.face(want, (path[0], path[1]))
+                        abs(yaw_err) > 0.35 or (abs(yaw_err) > self.turn_retol and self.head.confident)):
+                    self.face(want, (path[0], path[1]), min_err=min(0.12, 0.9 * self.turn_retol))
                     continue
                 if not self.lineup and abs(perp) > lineup_start and along < 0.3:
                     self.lineup = True
