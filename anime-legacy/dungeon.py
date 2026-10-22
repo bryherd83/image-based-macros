@@ -297,7 +297,10 @@ class Heading:
         # walking the way the keys say (not sliding along a wall): remember the speed, so the
         # dungeon can tell whether sprint is on (sprint stays at nominal, plain walking ~0.6x)
         raw = wrap(math.atan2(dy, dx) - ka)
-        if self.psi is not None and abs(wrap(raw - self.psi)) < 0.35:
+        # (pushing against a shut door / a wall says nothing about the speed: it made the mount
+        # look as slow as walking, so it never got back on after the check, sim 10-22)
+        if self.psi is not None and abs(wrap(raw - self.psi)) < 0.35 \
+                and not (self.nominal and speed < 0.3 * self.nominal):
             self.recent.append((dist, dt))
         if self.nominal == 0:
             self.nominal = speed
@@ -827,6 +830,186 @@ class DungeonRun:
         if n >= 3:
             e.shot(f"stuck-{n}")
 
+    # ---------------- straight lines and 90 degree turns (Blayne 10-22) ----------------
+    # "Go straight into the middle, stop, read which way to go, turn the camera, walk straight
+    # into the new room's middle, wait, turn." Only W (S / short taps to fix the stop point),
+    # no sidestepping onto door lines, no diagonal corrections, no sideways unsticking.
+    def _grid(self, path, cell, fx, fy, x, y, now, fight, use_sprint, stuck_spawn_sec):
+        """One step of the straight-line walk. True = handled this frame; False = let the old
+        code do it (walking around a room whose enemies are out of reach, Spawn after 40 s)."""
+        e, S = self.env, self.S
+        if self.grid_tries > int(S.get("grid_max_tries", 8)):
+            # can't settle in this room (a sliding mount, a misread): the old way for this room
+            self.grid_go = None
+            return False
+        psi = self.head.psi
+        spd = max(self.head.nominal or float(S.get("walk_rooms_per_sec", 0.27)), 0.05)
+        slide = max(0.04, spd * float(S.get("stop_lead_sec", 0.12)))
+        tol = float(S.get("grid_mid_tol", 0.06))
+        if len(path) > 1:
+            if self.leave_t is None:
+                self.leave_t = now
+            if now - self.leave_t > stuck_spawn_sec and now - self.last_spawn > 60:
+                return False                      # the old code presses Spawn
+        # ---- walking: through the door, then straight on to the next room's middle
+        g = self.grid_go
+        if g is not None:
+            frm, (nx, ny) = g
+            perp = fy if nx else fx
+            if abs(perp) > (0.09 if cell == frm else 0.15):
+                # drifting off the straight line (camera not quite along it): stop, back to the
+                # middle, turn again - instead of scraping along into the wall beside the door
+                self.grid_go = None
+                self.grid_tries += 1
+                self.stop()
+                e.sleep(0.15)
+                self.progress_ref = None
+                self.say("off the line · back to the middle")
+                return True
+            if cell == frm:
+                return self._grid_w(now, x, y, path, fight, use_sprint,
+                                    f"going through the door {dir_name((nx, ny))} · "
+                                    f"{len(path) - 1} room(s) to go")
+            if cell == (frm[0] + nx, frm[1] + ny):
+                along = fx * nx + fy * ny         # below 0 = not at the middle yet
+                if along < -slide:
+                    return self._grid_w(now, x, y, path, fight, use_sprint,
+                                        "walking straight to the middle")
+            # at the middle (or the map moved us: Spawn, a misread) - stop and look
+            self.grid_go = None
+            self.stop()
+            e.sleep(float(S.get("grid_stop_sec", 0.25)))
+            self.progress_ref = None
+            return True
+        # ---- get to the middle (straight lines; the bigger offset first)
+        if len(path) == 1 and self.clear_key == cell and self.sweep_since is not None:
+            return False
+        # in line with the next door exactly (that's what gets you through it); along the way
+        # you'll walk anyway it doesn't matter much
+        tx_, ty_ = tol, tol
+        if len(path) > 1:
+            dtol = float(S.get("grid_door_tol", 0.03))
+            if path[1][0] != cell[0]:
+                tx_, ty_ = 0.15, dtol
+            else:
+                tx_, ty_ = dtol, 0.15
+        need = sorted(((abs(c), c, ax) for c, ax, t_ in ((-fx, (1, 0), tx_), (-fy, (0, 1), ty_))
+                       if abs(c) > t_), reverse=True)
+        if need and self.grid_taps < 10:
+            # the direction the camera already looks along first (no turn needed), so it
+            # doesn't swing between the two when both are about as far off
+            cam_ax = (1, 0) if abs(math.cos(psi)) >= abs(math.sin(psi)) else (0, 1)
+            pick = [n for n in need if n[2] == cam_ax]
+            dist, c, ax = pick[0] if pick else need[0]
+            mv = (ax[0] * math.copysign(1, c), ax[1] * math.copysign(1, c))
+            fw = mv[0] * math.cos(psi) + mv[1] * math.sin(psi)
+            if abs(fw) < 0.7 and dist > 0.15:
+                # far off sideways (after Spawn / the start): turn and walk, don't sidestep
+                self.grid_tries += 1
+                self.face(math.atan2(mv[1], mv[0]), (cell, cell), min_err=self.turn_tol)
+                self.progress_ref = None
+                return True
+            k = ({"w"} if fw > 0 else {"s"}) if abs(fw) >= 0.7 else keys_for(mv[0], mv[1], psi)
+            if dist > slide + 0.05 and abs(fw) >= 0.7 and k == {"w"}:
+                return self._grid_w(now, x, y, path, fight, use_sprint, "walking straight to the middle")
+            # close: let the slide finish, then short taps onto the middle
+            self.stop()
+            self.grid_taps += 1
+            self.grid_tries += 0.5
+            ms = max(30, min(140, 0.6 * dist / spd * 1000))
+            self.hold(k)
+            e.sleep(ms / 1000)
+            self.stop()
+            e.sleep(float(S.get("mount_tap_pause_sec", 0.2)))
+            self.progress_ref = None
+            self.say("stopping in the middle")
+            return True
+        # ---- in the middle
+        self.grid_taps = 0
+        if len(path) == 1:
+            # the room to clear: stand here while the game attacks. Enemies out of reach
+            # (nothing hit for a while): the old code walks round the room for them
+            if self.clear_key != cell:
+                self.clear_key, self.clear_t = cell, now
+                self.sweep_i, self.sweep_since = 0, None
+            if self.sweep_since is not None:
+                return False                      # walking round for them: let it finish
+            waited = now - self.clear_t
+            quiet = now - max(self.clear_t, self.last_hit_t, self.en_change_t)
+            if fight and waited >= float(S.get("grid_sweep_after", 10)) and quiet >= 3 and not self.hitting:
+                return False
+            self.stop()
+            en = self.en_text
+            self.say((f"enemies left ({en})" if fight and en else "clearing the room") + f" · {waited:.0f}s")
+            e.sleep(0.05)
+            return True
+        self.clear_key = None
+        nx, ny = path[1][0] - cell[0], path[1][1] - cell[1]
+        want = math.atan2(ny, nx)
+        if abs(wrap(want - psi)) > self.turn_tol:
+            self.face(want, (path[0], path[1]), min_err=self.turn_tol)
+            self.progress_ref = None
+            return True
+        self.grid_go = (cell, (nx, ny))
+        self.grid_repressed = False
+        return self._grid_w(now, x, y, path, fight, use_sprint,
+                            f"going through the door {dir_name((nx, ny))} · {len(path) - 1} room(s) to go")
+
+    def _grid_w(self, now, x, y, path, fight, use_sprint, what):
+        """Hold W only. Not moving: press it again once (a key press right after a camera drag
+        can get lost), then back straight up a little (and jump) and try again."""
+        e = self.env
+        self.hold({"w"})
+        self.check_dismount(now)
+        if use_sprint:
+            self.check_sprint(now)
+        self.say(what)
+        if self.progress_ref is None:
+            self.progress_ref = (now, x, y)
+            self.grid_repressed = False
+            return True
+        t0, x0, y0 = self.progress_ref
+        if math.hypot(x - x0, y - y0) > 0.06:
+            self.progress_ref = (now, x, y)
+            self.grid_repressed = False
+            self.grid_stuck = 0 if math.hypot(x - x0, y - y0) > 0.3 else self.grid_stuck
+            return True
+        if now - t0 > 0.45 and not self.grid_repressed:
+            self.grid_repressed = True
+            self.stop()
+            e.sleep(0.05)
+            self.hold({"w"})
+            return True
+        if now - t0 > 1.4:
+            self.progress_ref = None
+            if fight and len(path) > 1:
+                self.hold_room_until = now + 6     # door shut by the fight: wait in the middle
+                self.grid_go = None
+                self.stop()
+                return True
+            self.grid_stuck += 1
+            self.stucks = getattr(self, "stucks", 0) + 1
+            if self.grid_stuck >= 4 and len(path) > 1:
+                self.mem.block(path[0], path[1], now, 45)
+                self.grid_stuck = 0
+                self.grid_go = None
+                self.stop()
+                e.log(f"door {dir_name((path[1][0] - path[0][0], path[1][1] - path[0][1]))} "
+                      f"won't let me through · trying another way for 45s")
+                e.shot("door-blocked")
+                return True
+            e.log(f"stuck ({self.grid_stuck}) · backing up straight" + (" and jumping" if self.grid_stuck >= 2 else ""))
+            if self.grid_stuck >= 2:
+                e.shot(f"stuck-{self.grid_stuck}")
+            self.hold({"s"})
+            e.sleep(0.35)
+            self.stop()
+            if self.grid_stuck >= 2:
+                e.tap("space", 80)
+            self.grid_go = None                  # back to the middle, look, turn, go again
+            e.sleep(0.15)
+        return True
+
     # ---------------- main loop ----------------
     def run(self):
         e = self.env
@@ -856,6 +1039,10 @@ class DungeonRun:
         lineup_done = float(S.get("lineup_done", 0.035))
         face_doors = bool(S.get("face_doors", True))
         use_sprint = bool(S.get("dungeon_sprint", True))
+        grid_walk = bool(S.get("grid_walk", True))
+        self.grid_go = None
+        self.grid_taps = self.grid_stuck = self.grid_tries = 0
+        self.grid_repressed = False
         last_hud = 0.0
         last_house = 0.0
         last_far = -1e9
@@ -945,6 +1132,7 @@ class DungeonRun:
                 self.turns_here = 0
                 self.leave_t = None
                 self.stuck_here = 0
+                self.grid_taps = self.grid_stuck = self.grid_tries = 0
             here = self.mem.here_kind(v)
             if self.last_here in TODO_KINDS and here == mm.CLEARED:
                 self.rooms_cleared += 1
@@ -1048,6 +1236,9 @@ class DungeonRun:
                 if math.hypot(fx, fy) > 0.15:
                     self.recover_vec, self.recover_until = (0.0, 0.0), now + 0.6
                     self.recover_why = "no door seen there · checking from the middle of the room"
+            if grid_walk and now >= self.recover_until and \
+                    self._grid(path, cell, fx, fy, x, y, now, fight, use_sprint, stuck_spawn_sec):
+                continue
             lat_tol = 0.0
             tol = 0.0
             # standing in a doorway (just came through it)? walk straight into the room first:
