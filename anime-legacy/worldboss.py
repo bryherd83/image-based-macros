@@ -221,11 +221,17 @@ class WorldBoss:
             return self._walk(plan)
         finally:
             if toggled:
-                e.set_keys({"s"})              # (only switches while moving: a tiny step back)
-                e.sleep(0.12)
-                tog("world boss walk: sprint off again")
-                e.sleep(0.05)
-                e.release_all()
+                ok = False
+                for _ in range(20):            # Roblox may not be the active window this moment
+                    e.set_keys({"s"})          # (only switches while moving: a tiny step back)
+                    e.sleep(0.12)
+                    ok = bool(tog("world boss walk: sprint off again"))
+                    e.release_all()
+                    if ok:
+                        break
+                    e.sleep(0.5)
+                if not ok:
+                    e.log("world boss walk: couldn't switch sprint off again (Roblox wasn't the active window)")
 
     def _walk(self, plan):
         e = self.env
