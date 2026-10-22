@@ -208,6 +208,11 @@ class WorldBoss:
         # (PC 10-21 21:19 test: the whole 16 s walk ended against the house just past the
         # campfire where he spawns: the last leg is 1.5 s shorter now)
         plan = S.get("world_boss_walk", [["w", 6.0], ["wd", 6.0], ["w", 2.5]])
+        # the plan was timed with sprint ON (test 21:19); walking without it is ~0.62 of that
+        # speed (dungeon logs), so walk longer unless sprint is known to be on. (Too far only
+        # bumps the house; it stops as soon as his bar shows anyway)
+        scale = 1.0 if getattr(e, "sprint_on", None) is True else float(S.get("world_boss_walk_scale", 1.6))
+        plan = [[k, float(sec) * scale] for k, sec in plan]
         t_trace = 0
         for keys, sec in plan:
             e.set_keys(set(keys))
