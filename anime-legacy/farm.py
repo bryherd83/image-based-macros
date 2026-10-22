@@ -30,6 +30,7 @@ from game import Game, load_settings, save_settings
 from reconnect import Watchdog
 from trial import run_trial
 from worldboss import WorldBoss
+from autotune import AutoTune
 
 HOTKEYS = {0x74: "F5", 0x75: "F6", 0x76: "F7", 0x77: "F8", 0x78: "F9", 0x79: "F10"}
 
@@ -338,6 +339,10 @@ class Farm:
             g.log("dungeon started")
             g.shot("dungeon-started", force=True)
         g.info["run"] = "dungeon"
+        if not hasattr(self, "tuner"):
+            self.tuner = AutoTune(self.S, lambda: save_settings(self.S), g.log)
+        if resume is None:
+            self.tuner.before()
         run = DungeonRun(g, resume_from=resume)
         t0 = time.monotonic()
         finished = run.run()
@@ -357,9 +362,23 @@ class Farm:
                 pass
             g.log(f"dungeon finished · {run.rooms_cleared} rooms cleared by the macro in {mins:.1f} min "
                   f"({done} cleared, {todo} left on the map)")
+            try:
+                self.tuner.after(run.time_in, run.rooms_cleared, run.stucks_total)
+            except Exception as ex:  # noqa: BLE001
+                g.log(f"learning: skipped this dungeon ({ex})")
             g.shot("dungeon-finished", force=True)
             g.status("dungeon finished")
+        elif getattr(self, "tuner", None) and self.tuner.trying and run.left_for == "trial":
+            self.tuner.after({}, 0, 0)          # (not a full dungeon: not counted)
+            self._left_for_trial(g, run, mins, done, todo)
         elif run.left_for == "trial":
+            self._left_for_trial(g, run, mins, done, todo)
+        else:
+            self.dungeon_saved, self.dungeon_saved_at = run, time.monotonic()
+            g.log(f"dungeon interrupted after {mins:.1f} min · will pick up within 2 minutes")
+
+    def _left_for_trial(self, g, run, mins, done, todo):
+        if True:
             # it clicked the Trial popup: wait until the dungeon is gone, then the next tick
             # finds the trial. If the click didn't take, the next tick picks the dungeon up again
             # and trial_check clicks again.
@@ -372,9 +391,6 @@ class Farm:
                 self.dungeon_saved = None
             g.log(f"left the dungeon for the trial after {mins:.1f} min · {run.rooms_cleared} rooms cleared "
                   f"by the macro ({done} cleared, {todo} left on the map)")
-        else:
-            self.dungeon_saved, self.dungeon_saved_at = run, time.monotonic()
-            g.log(f"dungeon interrupted after {mins:.1f} min · will pick up within 2 minutes")
 
     # ---------------- tests ----------------
     def test_screen(self):
@@ -566,9 +582,12 @@ class App:
                         variable=self.boss_var, command=self._picked).grid(row=7, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Test the walk", command=lambda: (self._picked(), w.withdraw(), self.farm.test_boss_walk())
                    ).grid(row=7, column=3, padx=4, sticky="w")
+        self.learn_var = tk.BooleanVar(value=bool(self.S.get("learn_dungeons", True)))
+        ttk.Checkbutton(w, text="Learn from every dungeon (tries settings, keeps the fastest)",
+                        variable=self.learn_var, command=self._picked).grid(row=8, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
-            row=8, column=0, padx=12, pady=10, sticky="w")
-        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=8, column=1, columnspan=2,
+            row=9, column=0, padx=12, pady=10, sticky="w")
+        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=9, column=1, columnspan=2,
                                                                                sticky="w")
         self.settings_win = w
         w.withdraw()
@@ -578,6 +597,7 @@ class App:
         self.S["join_trials"] = bool(self.trial_var.get())
         self.S["ride_mount"] = bool(self.mount_var.get())
         self.S["world_boss"] = bool(self.boss_var.get())
+        self.S["learn_dungeons"] = bool(self.learn_var.get())
         try:
             self.S["trial_leave_after"] = int(self.leave_var.get())
         except ValueError:

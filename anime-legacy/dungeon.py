@@ -419,6 +419,7 @@ class DungeonRun:
         self._say_t = None
         self.turn_settle = float(S.get("turn_settle_sec", 0.25))
         self.turn_stats = {"n": 0, "sec": 0.0, "drags": 0, "fixed": 0}
+        self.stucks_total = 0
         self.lost_drags = 0            # drags in a row that didn't turn the camera at all
         self.no_route_since = None
         self.spawn_shortcut = bool(S.get("spawn_shortcut", True))   # press Spawn when quicker
@@ -794,6 +795,7 @@ class DungeonRun:
         e = self.env
         now = e.now()
         self.stuck_here += 1
+        self.stucks_total += 1
         if self.stuck_here >= 9 and now - self.last_spawn > 60 and e.press_spawn():
             # nothing works from here (trapped, or the map reading is off): start over from spawn
             e.log("stuck over and over in the same place · pressed Spawn")

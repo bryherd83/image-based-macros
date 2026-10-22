@@ -41,6 +41,9 @@ DEFAULTS = {
     # Map 5 Dragon City afterwards. F5 has a box
     "world_boss": False,
     "mount_off_below": 0.5,             # moving slower than this share of mount speed = off it
+    # try a few values of the navigation settings, a few dungeons each, keep the fastest
+    # (autotune.py; F5 box)
+    "learn_dungeons": True,
     "spawn_shortcut": True,             # press Spawn when walking from the blue room is quicker
     "spawn_shortcut_rooms": 3.0,        # what pressing Spawn costs, in rooms of walking
     # while the new minimap is being sorted out: a small picture every 2 s during dungeons (the
