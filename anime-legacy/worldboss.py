@@ -227,7 +227,7 @@ class WorldBoss:
         meter goes above 0), then stand there (Blayne 10-21)."""
         e = self.env
         S = e.settings
-        most = float(S.get("home_walk_sec", 12))
+        most = float(S.get("home_walk_sec", 3.2))   # (usually hits at 2.2-2.8 s; when Goku Black is dead it walked 10 s, past him: laptop 10-22)
         dps = getattr(e, "dps", None)
         e.set_keys({"w"})
         t0 = e.now()
