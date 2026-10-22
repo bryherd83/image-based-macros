@@ -267,6 +267,8 @@ class Culling:
                 break
         if not opened:                          # don't scroll with no menu (it would zoom the camera)
             e.status("Worlds menu didn't open · retrying")
+            if click_below:
+                e.log(f"{what}: the Worlds menu didn't open")
             return False
         W, H = e.size()
         # Roblox only scrolls a menu after it has 'felt' the mouse on it
@@ -290,6 +292,8 @@ class Culling:
                 e.scroll(notch)
                 e.sleep(0.3)
         e.status(f"couldn't find {where} · retrying")
+        if click_below:
+            e.log(f"{what}: couldn't find its card in the Teleport menu")
         c = e.find("close")
         if c:
             e.close_menu(*c)

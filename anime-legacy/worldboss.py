@@ -62,6 +62,9 @@ class WorldBoss:
 
     def dungeon_finished(self):
         self.dungeon_done_hour = self._game_now().strftime("%m%d%H")
+        # first try ~10 s later: right after a dungeon the game is still bringing you back and
+        # the Worlds menu doesn't open (laptop 10-21 22:06 and 23:06, both 3 s after the end)
+        self.last_try = self.env.now() - 10
 
     def due(self):
         S = self.env.settings
