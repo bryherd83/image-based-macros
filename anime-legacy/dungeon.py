@@ -742,7 +742,10 @@ class DungeonRun:
             # check the turn on the arrow (Roblox drops part of a drag at a low frame rate) and
             # correct it, at most twice; learn the mouse-to-turn ratio from every drag
             for i in range(3):
-                a1 = self._settled_arrow()
+                # (fixed wait again: reading 'settled' as soon as two reads agreed caught the
+                # camera mid-turn on the laptop, 10-22: 5-23 stucks a dungeon vs 0-4 before)
+                self.env.sleep(self.turn_settle)
+                a1 = self.env.arrow()
                 if a1 is None:
                     break
                 turned = wrap(a1 - a0)
@@ -753,9 +756,7 @@ class DungeonRun:
                             self.env.log("camera didn't turn on 2 drags in a row · turning more carefully")
                     else:
                         self.lost_drags = 0
-                if abs(px) > 150 and abs(turned) > 0.3:
-                    # (every drag, also the corrections: learning only from the first one left
-                    # the laptop needing a correction on most turns, 1.7 s per turn on 10-21)
+                if i == 0 and abs(d) > 0.6 and abs(turned) > 0.3:
                     h.learn_from_arrow(px, turned)
                 h.psi, h.confident, h.turn_pending = a1, True, None
                 left = wrap(target - a1)

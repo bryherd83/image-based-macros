@@ -43,7 +43,7 @@ DEFAULTS = {
     "mount_off_below": 0.5,             # moving slower than this share of mount speed = off it
     # try a few values of the navigation settings, a few dungeons each, keep the fastest
     # (autotune.py; F5 box)
-    "learn_dungeons": True,
+    "learn_dungeons": False,
     "spawn_shortcut": True,             # press Spawn when walking from the blue room is quicker
     "spawn_shortcut_rooms": 3.0,        # what pressing Spawn costs, in rooms of walking
     # while the new minimap is being sorted out: a small picture every 2 s during dungeons (the
@@ -103,6 +103,14 @@ def load_settings():
             for k, (old, new) in CHANGED_DEFAULTS.items():
                 if s.get(k) == old:
                     s[k] = new
+            if not s.get("reset_1022"):
+                # 10-22: dungeons back to how they ran on 10-20 evening (Blayne: "what we had two
+                # days ago was good"): drop what the learning changed and switch it off
+                for k in ("stop_lead_sec", "lineup_start", "turn_tol", "turn_retol", "mount_lineup_taps",
+                          "spawn_shortcut_rooms", "turn_settle_sec", "autotune"):
+                    s.pop(k, None)
+                s["learn_dungeons"] = False
+                s["reset_1022"] = True
             return s
         except (OSError, ValueError):
             # unreadable: keep a copy instead of silently overwriting what was learned

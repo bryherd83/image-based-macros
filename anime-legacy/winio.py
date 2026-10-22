@@ -447,9 +447,9 @@ def right_drag(px: int, chunk: int = 20, step_ms: float = 12, slow: bool = False
         mouse_rel(target - done, 0)
         done = target
         time.sleep(step_ms / 1000)
-    time.sleep(0.12 if slow else 0.07)
+    time.sleep(0.12)
     mouse_button("right", False)
-    time.sleep(0.06 if slow else 0.03)
+    time.sleep(0.06)
 
 
 def jitter(a, b):
