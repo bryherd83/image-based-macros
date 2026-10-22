@@ -418,6 +418,7 @@ class DungeonRun:
         self.time_in: dict = {}        # seconds per activity this dungeon (for the log)
         self._say_t = None
         self.turn_settle = float(S.get("turn_settle_sec", 0.25))
+        self.turn_stats = {"n": 0, "sec": 0.0, "drags": 0, "fixed": 0}
         self.lost_drags = 0            # drags in a row that didn't turn the camera at all
         self.no_route_since = None
         self.spawn_shortcut = bool(S.get("spawn_shortcut", True))   # press Spawn when quicker
@@ -698,6 +699,28 @@ class DungeonRun:
                 pass
         self.env.cam_drag(px)
 
+    def _settled_arrow(self):
+        """The arrow once the camera has stopped moving after a drag: read every 60 ms until two
+        reads in a row agree (was a fixed 0.25 s wait; slow frames get a bit more time)."""
+        e = self.env
+        e.sleep(0.08)
+        last = e.arrow()
+        t0 = e.now()
+        while e.now() - t0 < self.turn_settle + 0.2:
+            e.sleep(0.06)
+            a = e.arrow()
+            if a is not None and last is not None and abs(wrap(a - last)) < 0.03:
+                return a
+            last = a
+        return last
+
+    def turn_summary(self):
+        ts = self.turn_stats
+        if not ts["n"]:
+            return ""
+        return (f"camera turns: {ts['n']}, {ts['sec'] / ts['n']:.1f}s each, "
+                f"{ts['drags'] / ts['n']:.1f} drags each, {100 * ts['fixed'] / ts['n']:.0f}% needed a correction")
+
     def face(self, target, edge, min_err=0.12):
         """Turn the camera to look along `target` (map angle). One drag, checked while walking."""
         h = self.head
@@ -707,17 +730,18 @@ class DungeonRun:
         if abs(d) < min_err:
             return
         self.stop()
+        t_start = self.env.now()
         a0 = self.env.arrow()
         px = round(d * h.k)
         self.say(f"turning the camera to face the door ({math.degrees(d):+.0f} deg)")
         self._drag(px)
         h.turned_by_mouse(px)
+        drags = 1
         if self.arrow_cam and a0 is not None:
             # check the turn on the arrow (Roblox drops part of a drag at a low frame rate) and
-            # correct it, at most twice; learn the mouse-to-turn ratio from it
+            # correct it, at most twice; learn the mouse-to-turn ratio from every drag
             for i in range(3):
-                self.env.sleep(self.turn_settle)
-                a1 = self.env.arrow()
+                a1 = self._settled_arrow()
                 if a1 is None:
                     break
                 turned = wrap(a1 - a0)
@@ -728,7 +752,9 @@ class DungeonRun:
                             self.env.log("camera didn't turn on 2 drags in a row · turning more carefully")
                     else:
                         self.lost_drags = 0
-                if i == 0 and abs(d) > 0.6 and abs(turned) > 0.3:
+                if abs(px) > 150 and abs(turned) > 0.3:
+                    # (every drag, also the corrections: learning only from the first one left
+                    # the laptop needing a correction on most turns, 1.7 s per turn on 10-21)
                     h.learn_from_arrow(px, turned)
                 h.psi, h.confident, h.turn_pending = a1, True, None
                 left = wrap(target - a1)
@@ -736,6 +762,12 @@ class DungeonRun:
                     break
                 a0, px = a1, round(left * h.k)
                 self._drag(px)
+                drags += 1
+            ts = self.turn_stats
+            ts["n"] += 1
+            ts["sec"] += self.env.now() - t_start
+            ts["drags"] += drags
+            ts["fixed"] += drags > 1
             self.last_turn = (edge, self.env.now())
             self.turns_here += 1
             self.progress_ref = None        # (turning took a moment: not 'stuck')
