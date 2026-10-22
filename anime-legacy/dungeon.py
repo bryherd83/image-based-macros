@@ -842,10 +842,38 @@ class DungeonRun:
             # can't settle in this room (a sliding mount, a misread): the old way for this room
             self.grid_go = None
             return False
+        if self.mount and self.mount_probe and (getattr(e, "mount_on", None) is False
+                                                 or float(S.get("mount_rooms_per_sec", 0) or 0) > 0):
+            # get on the mount right away, standing still (the speed check needs a lot of
+            # straight walking, and with stops in every middle that took 80 s - laptop 10-22
+            # 16:31). If it was on already this got it off: the speed check sees walking at
+            # ~30% of the known mount speed and presses M again
+            self.stop()
+            self.mount_probe = False
+            if e.toggle_mount("getting on the mount"):
+                e.mount_on = True
+                self.sprint_t = now
+                self.head.recent.clear()
+                e.sleep(0.6)
+            self.progress_ref = None
+            return True
         psi = self.head.psi
         spd = max(self.head.nominal or float(S.get("walk_rooms_per_sec", 0.27)), 0.05)
-        slide = max(0.04, spd * float(S.get("stop_lead_sec", 0.12)))
+        slide = max(0.04, spd * self.grid_lead)
         tol = float(S.get("grid_mid_tol", 0.06))
+        gm = self.grid_measure
+        if gm is not None and self.grid_go is None:
+            # where the last let-go of W really ended: past the middle = let go earlier next
+            # time, short of it = later (the mount and the laptop's lag slide further than a
+            # fixed guess; Blayne 10-22: 'overshooting the walk to the centre')
+            self.grid_measure = None
+            if cell == gm[0]:
+                over = fx * gm[1][0] + fy * gm[1][1]          # rooms past the middle
+                if abs(over) < 0.4:
+                    self.grid_lead = min(0.8, max(0.03, self.grid_lead + 0.6 * over / gm[2]))
+                    sv = getattr(e, "save_setting", None)
+                    if sv:
+                        sv("grid_lead_sec", round(self.grid_lead, 3), quiet=True)
         if len(path) > 1:
             if self.leave_t is None:
                 self.leave_t = now
@@ -876,6 +904,8 @@ class DungeonRun:
                     return self._grid_w(now, x, y, path, fight, use_sprint,
                                         "walking straight to the middle")
             # at the middle (or the map moved us: Spawn, a misread) - stop and look
+            if cell == (frm[0] + nx, frm[1] + ny):
+                self.grid_measure = (cell, (nx, ny), spd)
             self.grid_go = None
             self.stop()
             e.sleep(float(S.get("grid_stop_sec", 0.25)))
@@ -1043,6 +1073,8 @@ class DungeonRun:
         self.grid_go = None
         self.grid_taps = self.grid_stuck = self.grid_tries = 0
         self.grid_repressed = False
+        self.grid_lead = float(S.get("grid_lead_sec", S.get("stop_lead_sec", 0.12)))
+        self.grid_measure = None
         last_hud = 0.0
         last_house = 0.0
         last_far = -1e9
