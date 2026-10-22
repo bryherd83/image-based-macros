@@ -454,6 +454,7 @@ class DungeonRun:
         self.last_here = None
         self.lineup = False
         self.centred = False
+        self.at_mid = False
         self.last_status = ""
         self.finished = False
         self.arrow_check = None
@@ -977,6 +978,7 @@ class DungeonRun:
             if cell != self.cell:
                 self.cell, self.room_enter_t = cell, now
                 self.lineup = self.centred = False
+                self.at_mid = False
                 self.turns_here = 0
                 self.leave_t = None
                 self.stuck_here = 0
@@ -1158,7 +1160,9 @@ class DungeonRun:
                     continue
                 vx, vy = tx - fx, ty - fy
                 dc = math.hypot(vx, vy)
-                self.centred = dc <= (0.06 if self.centred else 0.03)
+                spd_c = self.head.nominal or float(S.get("walk_rooms_per_sec", 0.27))
+                in_r = max(0.05, spd_c * float(S.get("stop_lead_sec", 0.12)) * 1.5)
+                self.centred = dc <= (in_r + 0.05 if self.centred else in_r)
                 if self.centred:
                     self.stop()
                     self.say(f"{what} · {waited:.0f}s")
@@ -1182,7 +1186,21 @@ class DungeonRun:
                 # still looks the way you came in (so it's a straight walk, not a sidestep), then
                 # turn the camera to the door, then straight through. Lined up = within
                 # lineup_done, or just walked past the line (no stepping back for an overshoot)
-                if not self.lineup and abs(perp) > lineup_start and along < 0.3:
+                middle_mode = S.get("middle_then_turn", True)
+                if middle_mode and not self.at_mid:
+                    # Blayne 10-22: "go into the room, stand in the middle, turn 90, go straight".
+                    # Walk to the middle (no sidestepping), let go early by the slide so it doesn't
+                    # shoot past (mount + laptop lag), stop, then turn and go straight
+                    spd_m = self.head.nominal or float(S.get("walk_rooms_per_sec", 0.27))
+                    mid_r = max(0.06, spd_m * float(S.get("stop_lead_sec", 0.12)) * 1.5)
+                    if math.hypot(fx, fy) <= mid_r or along >= 0.25:
+                        self.at_mid = True
+                        self.stop()
+                        e.sleep(0.15)
+                        continue
+                    vx, vy = -fx, -fy
+                    what = f"walking to the middle · {len(path) - 1} room(s) to go"
+                elif not middle_mode and not self.lineup and abs(perp) > lineup_start and along < 0.3:
                     self.lineup = math.copysign(1, perp)
                 # let go early by how far you still slide after letting go (fast on the mount,
                 # and the laptop sees the map late): stop_lead_sec of the current speed
@@ -1191,11 +1209,15 @@ class DungeonRun:
                 if self.lineup and (abs(perp) <= done_at or along >= 0.3
                                     or math.copysign(1, perp) != self.lineup):
                     self.lineup = False
-                if not self.lineup and face_doors and self.turns_here < 6 and along < 0.42 and (
+                if middle_mode and not self.at_mid:
+                    pass
+                elif not self.lineup and face_doors and self.turns_here < 6 and along < 0.42 and (
                         abs(yaw_err) > 0.35 or (abs(yaw_err) > self.turn_retol and self.head.confident)):
                     self.face(want, (path[0], path[1]), min_err=min(0.12, 0.9 * self.turn_retol))
                     continue
-                if self.lineup:
+                if middle_mode and not self.at_mid:
+                    pass
+                elif self.lineup:
                     # step sideways onto the door's centre line (not back to the middle)
                     vx, vy = (0.0, -fy) if nx else (-fx, 0.0)
                     if getattr(e, "mount_on", None) and self.mount and S.get("mount_lineup_taps", True):

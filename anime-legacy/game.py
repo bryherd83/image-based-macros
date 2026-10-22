@@ -44,6 +44,8 @@ DEFAULTS = {
     # try a few values of the navigation settings, a few dungeons each, keep the fastest
     # (autotune.py; F5 box)
     "learn_dungeons": False,
+    # leaving a room: walk to its middle, stop, turn to the door, straight through (Blayne 10-22)
+    "middle_then_turn": True,
     "spawn_shortcut": True,             # press Spawn when walking from the blue room is quicker
     "spawn_shortcut_rooms": 3.0,        # what pressing Spawn costs, in rooms of walking
     # while the new minimap is being sorted out: a small picture every 2 s during dungeons (the
