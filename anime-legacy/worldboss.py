@@ -208,7 +208,6 @@ class WorldBoss:
         # (PC 10-21 21:19 test: the whole 16 s walk ended against the house just past the
         # campfire where he spawns: the last leg is 1.5 s shorter now)
         plan = S.get("world_boss_walk", [["w", 6.0], ["wd", 6.0], ["w", 2.5]])
-        dps = getattr(e, "dps", None)
         t_trace = 0
         for keys, sec in plan:
             e.set_keys(set(keys))
@@ -218,8 +217,9 @@ class WorldBoss:
                     e.release_all()
                     return False
                 f = e.frame()
-                # his bar, or already hitting him (the game attacks once in reach)
-                if boss_bar(f) or (dps and e.now() - t0 > 0.5 and dps()):
+                # only his own "World Boss" bar: the DPS meter can't be used here, a normal boss
+                # two steps from the landing spot gets hit first (PC 10-21 21:22)
+                if boss_bar(f):
                     e.sleep(float(S.get("world_boss_extra_walk", 0.6)))
                     e.release_all()
                     return True
@@ -228,4 +228,11 @@ class WorldBoss:
                     e.trace(f"world boss: walking {keys} · {e.now() - t0:.0f}s")
                 e.sleep(0.1)
         e.release_all()
-        return boss_bar(e.frame())
+        # at the end of the walk (by the campfire where he stands): his bar can take a few
+        # seconds to show up once you're there
+        t0 = e.now()
+        while e.running() and e.now() - t0 < float(S.get("world_boss_bar_wait_sec", 15)):
+            if boss_bar(e.frame()):
+                return True
+            e.sleep(0.3)
+        return False
