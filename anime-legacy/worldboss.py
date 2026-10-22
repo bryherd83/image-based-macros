@@ -98,6 +98,28 @@ class WorldBoss:
             return True
         return False
 
+    def _ok(self):
+        """False only when the farm is stopped. Roblox not being the active window (e.g. you
+        clicked another window) pauses here until it is again, instead of ending the walk at
+        once (laptop 10-21 23:08: both walks ended after 0 s)."""
+        e = self.env
+        stop = getattr(e, "stop_flag", None)
+        active = getattr(e, "active", None)
+        if active is None:
+            return e.running()
+        waited = 0.0
+        while not active():
+            if stop and stop():
+                return False
+            if waited == 0.0:
+                e.release_all()
+                e.status("world boss: paused · click on the Roblox window to go on")
+            e.sleep(0.5)
+            waited += 0.5
+            if waited > 120:
+                return False
+        return not (stop and stop())
+
     # ---- pieces ----
     def teleport(self, card, name):
         """Worlds -> Teleport menu -> the card -> its Teleport button. True once the lobby is back."""
@@ -139,7 +161,7 @@ class WorldBoss:
         e.shot("worldboss-fight", force=True)
         gone_since = None
         t0 = e.now()
-        while e.running():
+        while self._ok():
             if e.popup() is not None:           # a trial / dungeon: farm.tick joins it
                 e.log("world boss: a popup came up · leaving the boss for it")
                 return
@@ -196,7 +218,7 @@ class WorldBoss:
         t0 = e.now()
         hit = False
         try:
-            while e.running() and e.now() - t0 < most:
+            while self._ok() and e.now() - t0 < most:
                 if dps and dps():
                     hit = True
                     break
@@ -250,7 +272,7 @@ class WorldBoss:
             e.set_keys(set(keys))
             t0 = e.now()
             while e.now() - t0 < float(sec):
-                if not e.running():
+                if not self._ok():
                     e.release_all()
                     return False
                 f = e.frame()
@@ -268,7 +290,7 @@ class WorldBoss:
         # at the end of the walk (by the campfire where he stands): his bar can take a few
         # seconds to show up once you're there
         t0 = e.now()
-        while e.running() and e.now() - t0 < float(S.get("world_boss_bar_wait_sec", 15)):
+        while self._ok() and e.now() - t0 < float(S.get("world_boss_bar_wait_sec", 15)):
             if boss_bar(e.frame()):
                 return True
             e.sleep(0.3)
