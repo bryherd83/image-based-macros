@@ -208,11 +208,28 @@ class WorldBoss:
         # (PC 10-21 21:19 test: the whole 16 s walk ended against the house just past the
         # campfire where he spawns: the last leg is 1.5 s shorter now)
         plan = S.get("world_boss_walk", [["w", 6.0], ["wd", 6.0], ["w", 2.5]])
-        # the plan was timed with sprint ON (test 21:19); walking without it is ~0.62 of that
-        # speed (dungeon logs), so walk longer unless sprint is known to be on. (Too far only
-        # bumps the house; it stops as soon as his bar shows anyway)
-        scale = 1.0 if getattr(e, "sprint_on", None) is True else float(S.get("world_boss_walk_scale", 1.6))
-        plan = [[k, float(sec) * scale] for k, sec in plan]
+        # the plan was timed with sprint ON (test 21:19, "damn near perfect"): sprint goes on for
+        # the walk (it's a toggle, pressed while moving) unless it's known to be on already, and
+        # back off once there, so trials still start without it (Blayne 10-21)
+        toggled = False
+        tog = getattr(e, "toggle_sprint", None)
+        if tog and getattr(e, "sprint_on", None) is not True:
+            e.set_keys({"w"})
+            e.sleep(0.15)
+            toggled = bool(tog("world boss walk: sprint on"))
+        try:
+            return self._walk(plan)
+        finally:
+            if toggled:
+                e.set_keys({"s"})              # (only switches while moving: a tiny step back)
+                e.sleep(0.12)
+                tog("world boss walk: sprint off again")
+                e.sleep(0.05)
+                e.release_all()
+
+    def _walk(self, plan):
+        e = self.env
+        S = e.settings
         t_trace = 0
         for keys, sec in plan:
             e.set_keys(set(keys))
