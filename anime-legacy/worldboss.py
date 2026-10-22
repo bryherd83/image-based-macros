@@ -87,8 +87,7 @@ class WorldBoss:
             return True
         if self.need_home and e.popup() is None:
             self.last_try = e.now()
-            if self.teleport("dragoncity", "Dragon City"):
-                self.need_home = False
+            self.go_home()
             return True
         return False
 
@@ -171,6 +170,31 @@ class WorldBoss:
         if self.teleport("dragoncity", "Dragon City"):
             self.need_home = False
             self.env.log("world boss: back in Dragon City")
+            self.walk_to_goku()
+
+    def walk_to_goku(self):
+        """Map 5: walk forward from the landing spot until you start hitting Goku Black (the DPS
+        meter goes above 0), then stand there (Blayne 10-21)."""
+        e = self.env
+        S = e.settings
+        most = float(S.get("home_walk_sec", 12))
+        dps = getattr(e, "dps", None)
+        e.set_keys({"w"})
+        t0 = e.now()
+        hit = False
+        try:
+            while e.running() and e.now() - t0 < most:
+                if dps and dps():
+                    hit = True
+                    break
+                e.sleep(0.15)
+        finally:
+            e.release_all()
+        e.log(f"world boss: walked {e.now() - t0:.1f}s on Map 5 · "
+              + ("hitting Goku Black, standing here" if hit else "no hits on the DPS meter · stopped"))
+        if not hit:
+            e.shot("map5-no-hits", force=True)
+        return hit
 
     def walk_to_boss(self):
         """From the landing spot: straight ahead, then ahead-right (the boss is off to the top

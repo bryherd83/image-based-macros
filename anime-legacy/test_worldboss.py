@@ -47,6 +47,9 @@ class Fake:
         if self.where == "sins" and getattr(self, "near", False):
             return "bar" if self.t < self.fight_until else "nobar"
         return "nobar"
+    def dps(self):
+        return self.where == "dragon" and self.keys == {"w"} and self.t > self.walk_from + 3
+
     def find(self, name, f=None, **k):
         return (78, 619) if name == "worlds" else None
 
@@ -79,6 +82,7 @@ b.dungeon_finished(); assert b.due()
 at(14); b.done_hour = None; assert not b.due(), "went too late"
 at(6); g.t = 100
 assert b.tick("x") and g.where == "dragon", (g.where, g.lines)
+assert any("hitting Goku Black" in m for m in g.lines), g.lines
 assert any("at the boss" in m for m in g.lines) and any("over" in m for m in g.lines), g.lines
 assert not b.tick("x"), "went twice in one hour"
 g.settings["world_boss"] = False; b.done_hour = None; g.t += 100
