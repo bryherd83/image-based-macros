@@ -17,6 +17,8 @@ import os
 import cv2
 import numpy as np
 
+import hud
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 _MASK = None
 
@@ -167,7 +169,7 @@ class WorldBoss:
                 return
             f = e.frame()
             now = e.now()
-            if boss_bar(f):
+            if boss_bar(f) or self._hitting_him(f):
                 gone_since = None
                 e.status(f"world boss: fighting · {(now - t0) / 60:.1f} min")
             else:
@@ -276,9 +278,10 @@ class WorldBoss:
                     e.release_all()
                     return False
                 f = e.frame()
-                # only his own "World Boss" bar: the DPS meter can't be used here, a normal boss
-                # two steps from the landing spot gets hit first (PC 10-21 21:22)
-                if boss_bar(f):
+                # his own "World Boss" bar, or the small DPS number he gives (1-20-odd; the
+                # normal boss two steps from the landing spot gives billions, PC 10-21 21:22).
+                # The laptop walked past him at 23:10 while already hitting him for 7 DPS
+                if boss_bar(f) or self._hitting_him(f):
                     e.sleep(float(S.get("world_boss_extra_walk", 0.6)))
                     e.release_all()
                     return True
@@ -291,7 +294,15 @@ class WorldBoss:
         # seconds to show up once you're there
         t0 = e.now()
         while self._ok() and e.now() - t0 < float(S.get("world_boss_bar_wait_sec", 15)):
-            if boss_bar(e.frame()):
+            f = e.frame()
+            if boss_bar(f) or self._hitting_him(f):
                 return True
             e.sleep(0.3)
         return False
+
+    @staticmethod
+    def _hitting_him(f):
+        try:
+            return f is not None and not isinstance(f, str) and hud.dps_kind(f) == "small"
+        except Exception:
+            return False

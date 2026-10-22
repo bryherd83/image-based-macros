@@ -276,6 +276,40 @@ def new_dps_number_width(frame: np.ndarray) -> int | None:
     return round(w - NEW_DPS_WORD - 5) if w >= NEW_DPS_WORD + 10 else None
 
 
+def dps_kind(frame: np.ndarray) -> str | None:
+    """What the DPS number looks like: 'zero' ("0 DPS"), 'small' (1-3 plain digits: the world
+    boss takes only 1-20-odd damage a second, Blayne 10-21), 'big' (a long number with a
+    decimal point / letter: billions on a normal boss) or None (can't read it)."""
+    sx, sy = map_scale(frame)
+    x0, y0, x1, y1 = (round(NEW_DPS_BOX[0] * sx), round(NEW_DPS_BOX[1] * sy),
+                      round(NEW_DPS_BOX[2] * sx), round(NEW_DPS_BOX[3] * sy))
+    box = frame[y0:y1, x0:x1].astype(int)
+    if box.size == 0:
+        return None
+    m = (box[..., 0] > 150) & (box[..., 1] > 150) & (box[..., 2] < box[..., 1] + 25)
+    cols = np.flatnonzero(m.sum(axis=0) >= 1)
+    if cols.size == 0 or cols[0] > 8 * sx:
+        return None
+    start = end = cols[0]
+    for c in cols[1:]:                       # the number ends at the first gap of 5+ px
+        if c - end >= 5 * sx:
+            break
+        end = c
+    w = (end - start + 1) / sx
+    if w > 26:
+        return "big"
+    if w > 12:
+        return "small"
+    g = m[:, start:end + 1]
+    rows = np.flatnonzero(g.any(axis=1))
+    if rows.size < 6:
+        return None
+    mid = g[rows[0] + (rows[-1] - rows[0]) // 2 - 1: rows[0] + (rows[-1] - rows[0]) // 2 + 2]
+    c = g.shape[1] // 2
+    hole = not mid[:, c].any() and mid[:, 0].any() and mid[:, -1].any()
+    return "zero" if hole else "small"
+
+
 def dps_hitting(frame: np.ndarray) -> bool | None:
     """True = damage is being done, False = the meter says ~0, None = can't read it."""
     n = new_dps_number_width(frame)
