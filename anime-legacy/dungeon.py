@@ -854,6 +854,7 @@ class DungeonRun:
                 e.mount_on = True
                 self.sprint_t = now
                 self.head.recent.clear()
+                self.mount_verify = 2            # check it on the first straight walks
                 e.sleep(0.6)
             self.progress_ref = None
             return True
@@ -900,6 +901,14 @@ class DungeonRun:
                                     f"{len(path) - 1} room(s) to go")
             if cell == (frm[0] + nx, frm[1] + ny):
                 along = fx * nx + fy * ny         # below 0 = not at the middle yet
+                if len(path) > 1 and (path[1][0] - cell[0], path[1][1] - cell[1]) == (nx, ny) \
+                        and abs(perp) <= float(S.get("grid_door_tol", 0.04)) \
+                        and path[0] == cell and not fight:
+                    # the next door is straight ahead too: no stop, no turn - keep going
+                    self.grid_go = (cell, (nx, ny))
+                    return self._grid_w(now, x, y, path, fight, use_sprint,
+                                        f"going through the door {dir_name((nx, ny))} · "
+                                        f"{len(path) - 1} room(s) to go")
                 if along < -slide:
                     return self._grid_w(now, x, y, path, fight, use_sprint,
                                         "walking straight to the middle")
@@ -918,7 +927,7 @@ class DungeonRun:
         # you'll walk anyway it doesn't matter much
         tx_, ty_ = tol, tol
         if len(path) > 1:
-            dtol = float(S.get("grid_door_tol", 0.03))
+            dtol = float(S.get("grid_door_tol", 0.04))
             if path[1][0] != cell[0]:
                 tx_, ty_ = 0.15, dtol
             else:
@@ -944,9 +953,18 @@ class DungeonRun:
                 return self._grid_w(now, x, y, path, fight, use_sprint, "walking straight to the middle")
             # close: let the slide finish, then short taps onto the middle
             self.stop()
+            gt = self.grid_tap
+            if gt is not None and gt[0] == cell:
+                # how far did the last tap really go? (a mount slides on after a press, the
+                # laptop presses late) - size the next one by that
+                moved = abs((x - gt[1]) * gt[3][0] + (y - gt[2]) * gt[3][1])
+                expect = gt[5] * gt[4] / 1000
+                if expect > 0.003 and moved < 0.5:
+                    self.tap_gain = min(6.0, max(0.3, 0.6 * self.tap_gain + 0.4 * moved / expect))
             self.grid_taps += 1
             self.grid_tries += 0.5
-            ms = max(30, min(140, 0.6 * dist / spd * 1000))
+            ms = max(25, min(140, 0.8 * dist / (spd * self.tap_gain) * 1000))
+            self.grid_tap = (cell, x, y, mv, ms, spd)
             self.hold(k)
             e.sleep(ms / 1000)
             self.stop()
@@ -989,6 +1007,30 @@ class DungeonRun:
         """Hold W only. Not moving: press it again once (a key press right after a camera drag
         can get lost), then back straight up a little (and jump) and try again."""
         e = self.env
+        self.grid_tap = None                     # (walking: the next tap isn't measured from here)
+        if self.keys != {"w"}:
+            self.w_since = (now, x, y)
+        mv_ = getattr(self, "mount_verify", 0)
+        ws = getattr(self, "w_since", None)
+        msp = float(self.S.get("mount_rooms_per_sec", 0) or 0)
+        if mv_ and ws and msp > 0 and now - ws[0] >= 1.0:
+            # was that start-of-dungeon press right? (if it was on the mount already - e.g. a
+            # restart in the middle of a dungeon - the press got it OFF: laptop 10-22 16:38)
+            sp = math.hypot(x - ws[1], y - ws[2]) / (now - ws[0])
+            if sp >= 0.7 * msp:
+                self.mount_verify = 0
+            elif sp > 0.05:
+                self.mount_verify = mv_ - 1
+                if sp < 0.5 * msp and e.toggle_mount(
+                        f"walking at {sp / msp:.0%} of mount speed, so not on the mount · getting on"):
+                    e.mount_on = True
+                    self.mount_verify = 1 if mv_ > 1 else 0
+                    e.sleep(0.6)
+                    self.progress_ref = None
+                self.w_since = None
+                self.keys = set()
+                e.set_keys(set())
+                return True
         self.hold({"w"})
         self.check_dismount(now)
         if use_sprint:
@@ -1075,6 +1117,8 @@ class DungeonRun:
         self.grid_repressed = False
         self.grid_lead = float(S.get("grid_lead_sec", S.get("stop_lead_sec", 0.12)))
         self.grid_measure = None
+        self.grid_tap = None
+        self.tap_gain = 1.0
         last_hud = 0.0
         last_house = 0.0
         last_far = -1e9
