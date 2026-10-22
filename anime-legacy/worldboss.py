@@ -149,6 +149,24 @@ class WorldBoss:
             e.sleep(0.5)
         self.go_home()
 
+    def test_walk(self):
+        """F5 test button: teleport to Sins Kingdom and do the walk, then stay there so you can
+        see where it ended up (no boss needed: without one it walks the whole plan)."""
+        e = self.env
+        e.release_all()
+        if not self.teleport("sinskingdom", "Sins Kingdom"):
+            e.log("world boss test: couldn't teleport to Sins Kingdom")
+            e.shot("worldboss-test-no-teleport", force=True)
+            return "couldn't teleport to Sins Kingdom"
+        t0 = e.now()
+        found = self.walk_to_boss()
+        msg = (f"world boss test: walked {e.now() - t0:.0f}s · "
+               + ("the boss's health bar showed, stopped there" if found else
+                  "no health bar (no boss up, or not reached) · this is where the walk ends"))
+        e.log(msg)
+        e.shot("worldboss-test-end", force=True)
+        return msg.replace("world boss test: ", "")
+
     def go_home(self):
         if self.teleport("dragoncity", "Dragon City"):
             self.need_home = False

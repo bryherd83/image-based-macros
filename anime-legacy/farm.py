@@ -125,6 +125,31 @@ class Farm:
         self.thread.start()
         self.app.toast("Auto farm ON (F6 to stop)")
 
+    def test_boss_walk(self):
+        """F5 button: the world boss walk on its own (teleport to Map 4, walk, stay there)."""
+        if self.running:
+            self.app.toast("Stop the farm first (F6), then press the test again")
+            return
+        if not winio.find_roblox():
+            self.app.toast("Can't find Roblox. Open the game first.")
+            return
+        winio.activate(winio.find_roblox())
+        self.running = True
+
+        def go():
+            g = self.game
+            try:
+                g.log("=== world boss walk test ===")
+                res = WorldBoss(g, Culling(g)).test_walk()
+                self.app.toast("World boss test: " + res, 10000)
+            except Exception as e:  # noqa: BLE001
+                g.log("error: " + "".join(traceback.format_exception(e))[-1500:])
+            finally:
+                self.running = False
+                g.release_all()
+        self.thread = threading.Thread(target=go, daemon=True)
+        self.thread.start()
+
     def stop(self):
         self.running = False
         self.game.release_all()
@@ -537,6 +562,8 @@ class App:
         self.boss_var = tk.BooleanVar(value=bool(self.S.get("world_boss", False)))
         ttk.Checkbutton(w, text="World boss at the top of every hour (Map 4), then back to Map 5",
                         variable=self.boss_var, command=self._picked).grid(row=7, column=0, columnspan=3, **pad)
+        ttk.Button(w, text="Test the walk", command=lambda: (self._picked(), w.withdraw(), self.farm.test_boss_walk())
+                   ).grid(row=7, column=3, padx=4, sticky="w")
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
             row=8, column=0, padx=12, pady=10, sticky="w")
         ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=8, column=1, columnspan=2,

@@ -85,4 +85,9 @@ g.settings["world_boss"] = False; b.done_hour = None; g.t += 100
 assert not b.tick("x"), "went with the setting off"
 wbm.dt.datetime = real
 print("2: trip:", " | ".join(m for m in g.lines))
+# 3. the F5 test walk: teleports, walks, stays on Map 4
+g = Fake(); b = wbm.WorldBoss(g, FakeCulling(g))
+res = b.test_walk()
+assert g.where == "sins" and "health bar showed" in res, (g.where, res)
+print("3: test walk ->", res)
 print("world boss: ok")
