@@ -41,10 +41,6 @@ DEFAULTS = {
     # Map 5 Dragon City afterwards. F5 has a box
     "world_boss": False,
     "mount_off_below": 0.5,             # moving slower than this share of mount speed = off it
-    # leaving a room: walk to its middle, stop, turn to the door, straight through (Blayne 10-22)
-    "middle_then_turn": True,
-    # dungeons: straight to the middle, stop, turn 90, straight to the next middle (Blayne 10-22)
-    "grid_walk": True,
     "spawn_shortcut": True,             # press Spawn when walking from the blue room is quicker
     "spawn_shortcut_rooms": 3.0,        # what pressing Spawn costs, in rooms of walking
     # while the new minimap is being sorted out: a small picture every 2 s during dungeons (the
@@ -104,15 +100,6 @@ def load_settings():
             for k, (old, new) in CHANGED_DEFAULTS.items():
                 if s.get(k) == old:
                     s[k] = new
-            for k in ("learn_dungeons", "autotune"):     # (self-learning removed 10-22)
-                s.pop(k, None)
-            if not s.get("reset_1022"):
-                # 10-22: dungeons back to how they ran on 10-20 evening (Blayne: "what we had two
-                # days ago was good"): drop what the learning changed and switch it off
-                for k in ("stop_lead_sec", "lineup_start", "turn_tol", "turn_retol", "mount_lineup_taps",
-                          "spawn_shortcut_rooms", "turn_settle_sec", "autotune"):
-                    s.pop(k, None)
-                s["reset_1022"] = True
             return s
         except (OSError, ValueError):
             # unreadable: keep a copy instead of silently overwriting what was learned
@@ -235,10 +222,10 @@ class Game:
         self.hwnd = None
         self.rect = None
         self.held = set()
-        self._sprint_on = None            # sprint: True/False once a dungeon has checked, None = unknown
+        self.sprint_on = None            # sprint: True/False once a dungeon has checked, None = unknown
         # on the mount: True/False once a dungeon has checked, None = unknown. The game keeps you
         # on it (also through teleports) until M is pressed again
-        self._mount_on = None
+        self.mount_on = None
         self.zoom_hover = None
         self.info = {}
         self.last_rect_check = 0.0
@@ -496,28 +483,6 @@ class Game:
         self.log(f"sprint key pressed{' · ' + why if why else ''}")
         time.sleep(0.12)
         return True
-
-    # mount / sprint state: remembered in settings.json, because the game keeps them through a
-    # restart of the macro (a trial right after a restart ran on the mount, laptop 10-21 22:15)
-    @property
-    def mount_on(self):
-        return self._mount_on
-
-    @mount_on.setter
-    def mount_on(self, v):
-        if v != self._mount_on:
-            self._mount_on = v
-            self.save_setting("last_mount_on", v, quiet=True)
-
-    @property
-    def sprint_on(self):
-        return self._sprint_on
-
-    @sprint_on.setter
-    def sprint_on(self, v):
-        if v != self._sprint_on:
-            self._sprint_on = v
-            self.save_setting("last_sprint_on", v, quiet=True)
 
     def toggle_mount(self, why=""):
         """Taps the mount key (gets on / off the mount). Only while Roblox is in front."""

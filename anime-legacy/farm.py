@@ -351,8 +351,6 @@ class Farm:
                 self.boss.dungeon_finished()
             try:
                 g.log(f"dungeon time: {run.time_summary()}")
-                if getattr(run, "turn_summary", None) and run.turn_summary():
-                    g.log(run.turn_summary())
             except Exception:
                 pass
             g.log(f"dungeon finished · {run.rooms_cleared} rooms cleared by the macro in {mins:.1f} min "
@@ -360,13 +358,6 @@ class Farm:
             g.shot("dungeon-finished", force=True)
             g.status("dungeon finished")
         elif run.left_for == "trial":
-            self._left_for_trial(g, run, mins, done, todo)
-        else:
-            self.dungeon_saved, self.dungeon_saved_at = run, time.monotonic()
-            g.log(f"dungeon interrupted after {mins:.1f} min · will pick up within 2 minutes")
-
-    def _left_for_trial(self, g, run, mins, done, todo):
-        if True:
             # it clicked the Trial popup: wait until the dungeon is gone, then the next tick
             # finds the trial. If the click didn't take, the next tick picks the dungeon up again
             # and trial_check clicks again.
@@ -379,6 +370,9 @@ class Farm:
                 self.dungeon_saved = None
             g.log(f"left the dungeon for the trial after {mins:.1f} min · {run.rooms_cleared} rooms cleared "
                   f"by the macro ({done} cleared, {todo} left on the map)")
+        else:
+            self.dungeon_saved, self.dungeon_saved_at = run, time.monotonic()
+            g.log(f"dungeon interrupted after {mins:.1f} min · will pick up within 2 minutes")
 
     # ---------------- tests ----------------
     def test_screen(self):
@@ -570,12 +564,9 @@ class App:
                         variable=self.boss_var, command=self._picked).grid(row=7, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Test the walk", command=lambda: (self._picked(), w.withdraw(), self.farm.test_boss_walk())
                    ).grid(row=7, column=3, padx=4, sticky="w")
-        self.grid_var = tk.BooleanVar(value=bool(self.S.get("grid_walk", True)))
-        ttk.Checkbutton(w, text="Dungeons: straight lines (middle, stop, turn 90, straight to the next middle)",
-                        variable=self.grid_var, command=self._picked).grid(row=8, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
-            row=9, column=0, padx=12, pady=10, sticky="w")
-        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=9, column=1, columnspan=2,
+            row=8, column=0, padx=12, pady=10, sticky="w")
+        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=8, column=1, columnspan=2,
                                                                                sticky="w")
         self.settings_win = w
         w.withdraw()
@@ -585,7 +576,6 @@ class App:
         self.S["join_trials"] = bool(self.trial_var.get())
         self.S["ride_mount"] = bool(self.mount_var.get())
         self.S["world_boss"] = bool(self.boss_var.get())
-        self.S["grid_walk"] = bool(self.grid_var.get())
         try:
             self.S["trial_leave_after"] = int(self.leave_var.get())
         except ValueError:

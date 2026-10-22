@@ -257,7 +257,6 @@ def run_trial(env, mode, leave_after):
     unreached_since = None        # first Spawn retry in the room being fought (None = none yet)
     covered_since = 0.0
     env.sleep(1.5)
-    env._trial_mount_flip = False
     sprint_off_for_trial(env, S)
     f = env.frame()
     room = spawn_and_walk(clean=f is not None and hud.dps_hitting(f) is False)
@@ -351,17 +350,6 @@ def run_trial(env, mode, leave_after):
                 unreached_since = now
             elif room.retries == 1:
                 env.shot("trial-unreachable", force=True)     # second retry: a picture of why
-            # the farm's idea of the mount can be wrong (you got on/off by hand, or it was set
-            # before a restart): riding in a trial overshoots the enemies like this (laptop 10-21
-            # 22:15 / 23:45). Once per trial, press M on the second miss
-            if room.retries == 1 and not getattr(env, "_trial_mount_flip", False) \
-                    and getattr(env, "toggle_mount", None) and S.get("ride_mount", True):
-                env._trial_mount_flip = True
-                env.set_keys({"w"})
-                env.sleep(0.15)
-                env.toggle_mount("trial: still can't reach them · maybe the mount is on/off wrong, pressing M once")
-                env.sleep(0.2)
-                env.release_all()
             # still nothing after trial_give_up_sec of retries (laptop 10-16 09:18: 12 minutes of
             # Spawn retries in wave 21 until the dungeon popup came): leave with what's been won
             give_up = float(S.get("trial_give_up_sec", 180))
