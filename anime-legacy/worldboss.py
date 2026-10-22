@@ -207,7 +207,7 @@ class WorldBoss:
         S = e.settings
         # (PC 10-21 21:19 test: the whole 16 s walk ended against the house just past the
         # campfire where he spawns: the last leg is 1.5 s shorter now)
-        plan = S.get("world_boss_walk", [["w", 6.0], ["wd", 6.0], ["w", 2.5]])
+        plan = S.get("world_boss_walk", [["w", 6.0], ["wd", 6.0], ["w", 1.0]])
         # the plan was timed with sprint ON (test 21:19, "damn near perfect"): sprint goes on for
         # the walk (it's a toggle, pressed while moving) unless it's known to be on already, and
         # back off once there, so trials still start without it (Blayne 10-21)
