@@ -455,6 +455,8 @@ class DungeonRun:
         self.lineup = False
         self.centred = False
         self.at_mid = False
+        self.mid_let_go = False
+        self.mid_taps = 0
         self.last_status = ""
         self.finished = False
         self.arrow_check = None
@@ -979,6 +981,8 @@ class DungeonRun:
                 self.cell, self.room_enter_t = cell, now
                 self.lineup = self.centred = False
                 self.at_mid = False
+                self.mid_let_go = False
+                self.mid_taps = 0
                 self.turns_here = 0
                 self.leave_t = None
                 self.stuck_here = 0
@@ -1191,13 +1195,38 @@ class DungeonRun:
                     # Blayne 10-22: "go into the room, stand in the middle, turn 90, go straight".
                     # Walk to the middle (no sidestepping), let go early by the slide so it doesn't
                     # shoot past (mount + laptop lag), stop, then turn and go straight
+                    # 10-22 15:00 fix: "in the middle" used the slide distance as its tolerance,
+                    # which on the mount (~1.4 rooms/s) is a quarter of a room - it stopped well off
+                    # the door's line, turned, and walked into the wall beside the door. Now: let go
+                    # early by the slide, wait for it to stop, then short taps to the real middle
                     spd_m = self.head.nominal or float(S.get("walk_rooms_per_sec", 0.27))
-                    mid_r = max(0.06, spd_m * float(S.get("stop_lead_sec", 0.12)) * 1.5)
-                    if math.hypot(fx, fy) <= mid_r or (along >= 0.25 and abs(perp) <= mid_r):
+                    slide = max(0.06, spd_m * float(S.get("stop_lead_sec", 0.12)) * 1.5)
+                    mid_ok = float(S.get("middle_done", 0.06))
+                    d_mid = math.hypot(fx, fy)
+                    if d_mid <= mid_ok or (along >= 0.25 and abs(perp) <= lineup_done) \
+                            or self.mid_taps >= 6:
                         self.at_mid = True
                         self.stop()
                         e.sleep(0.15)
                         continue
+                    if not self.mid_let_go and d_mid <= slide:
+                        self.mid_let_go = True
+                        self.stop()
+                        e.sleep(0.3)                # let the slide finish, then look again
+                        self.progress_ref = None
+                        continue
+                    if self.mid_let_go:
+                        k = keys_for(-fx, -fy, self.head.psi)
+                        if k:
+                            self.mid_taps += 1
+                            ms = max(35, min(140, 0.6 * d_mid / max(spd_m, 0.05) * 1000))
+                            self.hold(k)
+                            e.sleep(ms / 1000)
+                            self.stop()
+                            e.sleep(float(S.get("mount_tap_pause_sec", 0.2)))
+                            self.progress_ref = None
+                            self.say(f"walking to the middle · {len(path) - 1} room(s) to go")
+                            continue
                     vx, vy = -fx, -fy
                     what = "walking to the middle"
                 elif not middle_mode and not self.lineup and abs(perp) > lineup_start and along < 0.3:
