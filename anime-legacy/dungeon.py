@@ -1061,25 +1061,30 @@ class DungeonRun:
                 return True
             self.grid_stuck += 1
             self.stucks = getattr(self, "stucks", 0) + 1
-            if self.grid_stuck >= 4 and len(path) > 1:
-                self.mem.block(path[0], path[1], now, 45)
+            self.grid_tries += 1
+            edge_s = dir_name((path[1][0] - path[0][0], path[1][1] - path[0][1])) if len(path) > 1 else ""
+            if self.grid_stuck >= 2 and len(path) > 1:
+                # still can't get through: usually other players / fighters standing in the
+                # doorway (laptop 10-22 17:05-17:08: six tries into the same crowd, then Spawn
+                # after 40 s). Take another way now; come back to this door later
+                self.mem.block(path[0], path[1], now, 60)
                 self.grid_stuck = 0
                 self.grid_go = None
                 self.stop()
-                e.log(f"door {dir_name((path[1][0] - path[0][0], path[1][1] - path[0][1]))} "
-                      f"won't let me through · trying another way for 45s")
+                e.log(f"stuck (2) · door {edge_s} blocked (players in the doorway?) · another way for 60s")
                 e.shot("door-blocked")
                 return True
-            e.log(f"stuck ({self.grid_stuck}) · backing up straight" + (" and jumping" if self.grid_stuck >= 2 else ""))
-            if self.grid_stuck >= 2:
-                e.shot(f"stuck-{self.grid_stuck}")
+            # first time: back up a step and jump forward through (over whoever stands there)
+            e.log(f"stuck (1) · backing up and jumping through the door {edge_s}".rstrip())
             self.hold({"s"})
             e.sleep(0.35)
             self.stop()
-            if self.grid_stuck >= 2:
-                e.tap("space", 80)
-            self.grid_go = None                  # back to the middle, look, turn, go again
-            e.sleep(0.15)
+            e.sleep(0.1)
+            self.hold({"w"})
+            e.sleep(0.12)
+            e.tap("space", 80)
+            self.progress_ref = None
+            self.grid_repressed = True
         return True
 
     # ---------------- main loop ----------------
