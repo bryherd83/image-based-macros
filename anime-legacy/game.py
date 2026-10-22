@@ -222,10 +222,10 @@ class Game:
         self.hwnd = None
         self.rect = None
         self.held = set()
-        self.sprint_on = None            # sprint: True/False once a dungeon has checked, None = unknown
+        self._sprint_on = settings.get("last_sprint_on")            # sprint: True/False once a dungeon has checked, None = unknown
         # on the mount: True/False once a dungeon has checked, None = unknown. The game keeps you
         # on it (also through teleports) until M is pressed again
-        self.mount_on = None
+        self._mount_on = settings.get("last_mount_on")
         self.zoom_hover = None
         self.info = {}
         self.last_rect_check = 0.0
@@ -483,6 +483,28 @@ class Game:
         self.log(f"sprint key pressed{' · ' + why if why else ''}")
         time.sleep(0.12)
         return True
+
+    # mount / sprint state: remembered in settings.json, because the game keeps them through a
+    # restart of the macro (a trial right after a restart ran on the mount, laptop 10-21 22:15)
+    @property
+    def mount_on(self):
+        return self._mount_on
+
+    @mount_on.setter
+    def mount_on(self, v):
+        if v != self._mount_on:
+            self._mount_on = v
+            self.save_setting("last_mount_on", v, quiet=True)
+
+    @property
+    def sprint_on(self):
+        return self._sprint_on
+
+    @sprint_on.setter
+    def sprint_on(self, v):
+        if v != self._sprint_on:
+            self._sprint_on = v
+            self.save_setting("last_sprint_on", v, quiet=True)
 
     def toggle_mount(self, why=""):
         """Taps the mount key (gets on / off the mount). Only while Roblox is in front."""

@@ -82,8 +82,12 @@ class WorldBoss:
             return False
         if self.due():
             self.last_try = e.now()
-            self.done_hour = self._game_now().strftime("%m%d%H")
-            self.run()
+            hour = self._game_now().strftime("%m%d%H")
+            self.tries = self.tries if getattr(self, "tries_hour", None) == hour else 0
+            self.tries_hour = hour
+            self.tries += 1
+            if self.run() is not False or self.tries >= 4:
+                self.done_hour = hour
             return True
         if self.need_home and e.popup() is None:
             self.last_try = e.now()
@@ -117,9 +121,11 @@ class WorldBoss:
         S = e.settings
         e.release_all()
         if not self.teleport("sinskingdom", "Sins Kingdom"):
-            e.log("world boss: couldn't teleport to Sins Kingdom · skipping this hour")
+            last = getattr(self, "tries", 1) >= 4
+            e.log("world boss: couldn't teleport to Sins Kingdom · "
+                  + ("skipping this hour" if last else "trying again in 20 s"))
             e.shot("worldboss-no-teleport", force=True)
-            return
+            return False
         self.need_home = True
         if not self.walk_to_boss():
             e.log("world boss: didn't find him from the landing spot · going back")

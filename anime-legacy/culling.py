@@ -249,11 +249,10 @@ class Culling:
         spot that many px (at 1080p) below it: a card title's Teleport button). True if clicked."""
         e = self.env
         w = e.find("worlds", f)
-        if w is None:
-            e.status("can't see the Worlds button")
-            return False
         opened = False
         for how in ("key", "click"):
+            if how == "click" and w is None:
+                break
             if how == "key":
                 e.tap(e.settings.get("worlds_key", "t"), 80)
             else:
