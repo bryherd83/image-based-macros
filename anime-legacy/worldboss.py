@@ -95,8 +95,12 @@ class WorldBoss:
     def teleport(self, card, name):
         """Worlds -> Teleport menu -> the card -> its Teleport button. True once the lobby is back."""
         e = self.env
-        f = e.frame()
-        ok = self.culling.open_card(f, card, name, name, click_below=392)
+        ok = False
+        for _ in range(2):                      # (the first Worlds press can be missed: PC 21:18)
+            ok = self.culling.open_card(e.frame(), card, name, name, click_below=392)
+            if ok:
+                break
+            e.sleep(1.0)
         if not ok:
             return False
         e.log(f"world boss: teleporting to {name}")
@@ -201,7 +205,10 @@ class WorldBoss:
         right), until the bar shows; a few more steps in, then stop."""
         e = self.env
         S = e.settings
-        plan = S.get("world_boss_walk", [["w", 6.0], ["wd", 6.0], ["w", 4.0]])
+        # (PC 10-21 21:19 test: the whole 16 s walk ended against the house just past the
+        # campfire where he spawns: the last leg is 1.5 s shorter now)
+        plan = S.get("world_boss_walk", [["w", 6.0], ["wd", 6.0], ["w", 2.5]])
+        dps = getattr(e, "dps", None)
         t_trace = 0
         for keys, sec in plan:
             e.set_keys(set(keys))
@@ -211,7 +218,8 @@ class WorldBoss:
                     e.release_all()
                     return False
                 f = e.frame()
-                if boss_bar(f):
+                # his bar, or already hitting him (the game attacks once in reach)
+                if boss_bar(f) or (dps and e.now() - t0 > 0.5 and dps()):
                     e.sleep(float(S.get("world_boss_extra_walk", 0.6)))
                     e.release_all()
                     return True
