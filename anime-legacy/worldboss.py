@@ -143,10 +143,22 @@ class WorldBoss:
                 return True
         return False
 
+    def _off_mount(self):
+        """A dungeon leaves you on the mount; the walks were timed on foot (with sprint, Blayne
+        10-21). The next dungeon gets back on by itself."""
+        e = self.env
+        if getattr(e, "mount_on", None) is True and getattr(e, "toggle_mount", None):
+            e.set_keys({"w"})
+            e.sleep(0.15)
+            e.toggle_mount("world boss: off the mount (the walk is timed on foot)")
+            e.sleep(0.3)
+            e.release_all()
+
     def run(self):
         e = self.env
         S = e.settings
         e.release_all()
+        self._off_mount()
         if not self.teleport("sinskingdom", "Sins Kingdom"):
             last = getattr(self, "tries", 1) >= 4
             e.log("world boss: couldn't teleport to Sins Kingdom · "
@@ -190,6 +202,7 @@ class WorldBoss:
         see where it ended up (no boss needed: without one it walks the whole plan)."""
         e = self.env
         e.release_all()
+        self._off_mount()
         if not self.teleport("sinskingdom", "Sins Kingdom"):
             e.log("world boss test: couldn't teleport to Sins Kingdom")
             e.shot("worldboss-test-no-teleport", force=True)
