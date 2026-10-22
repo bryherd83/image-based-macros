@@ -701,7 +701,7 @@ class DungeonRun:
                 pass
         self.env.cam_drag(px)
 
-    def face(self, target, edge, min_err=0.12):
+    def face(self, target, edge, min_err=0.12, fixes=2):
         """Turn the camera to look along `target` (map angle). One drag, checked while walking."""
         h = self.head
         if h.psi is None:
@@ -735,7 +735,7 @@ class DungeonRun:
                     h.learn_from_arrow(px, turned)
                 h.psi, h.confident, h.turn_pending = a1, True, None
                 left = wrap(target - a1)
-                if abs(left) < self.turn_tol or i == 2:
+                if abs(left) < self.turn_tol or i >= fixes:
                     break
                 a0, px = a1, round(left * h.k)
                 self._drag(px)
@@ -895,6 +895,13 @@ class DungeonRun:
                 self.progress_ref = None
                 self.say("off the line · back to the middle")
                 return True
+            if cell == frm and (len(path) < 2 or path[1] != (frm[0] + nx, frm[1] + ny)):
+                # the route changed on the way (someone cleared the room, enemies here): don't
+                # walk into that door anyway - stop and look again
+                self.grid_go = None
+                self.stop()
+                self.progress_ref = None
+                return True
             if cell == frm:
                 return self._grid_w(now, x, y, path, fight, use_sprint,
                                     f"going through the door {dir_name((nx, ny))} · "
@@ -995,7 +1002,8 @@ class DungeonRun:
         nx, ny = path[1][0] - cell[0], path[1][1] - cell[1]
         want = math.atan2(ny, nx)
         if abs(wrap(want - psi)) > self.turn_tol:
-            self.face(want, (path[0], path[1]), min_err=self.turn_tol)
+            self.face(want, (path[0], path[1]), min_err=self.turn_tol,
+                      fixes=int(S.get("grid_turn_fixes", 1)))
             self.progress_ref = None
             return True
         self.grid_go = (cell, (nx, ny))
@@ -1046,7 +1054,7 @@ class DungeonRun:
             self.grid_repressed = False
             self.grid_stuck = 0 if math.hypot(x - x0, y - y0) > 0.3 else self.grid_stuck
             return True
-        if now - t0 > 0.45 and not self.grid_repressed:
+        if now - t0 > 0.3 and not self.grid_repressed:
             self.grid_repressed = True
             self.stop()
             e.sleep(0.05)
@@ -1072,7 +1080,6 @@ class DungeonRun:
                 self.grid_go = None
                 self.stop()
                 e.log(f"stuck (2) · door {edge_s} blocked (players in the doorway?) · another way for 60s")
-                e.shot("door-blocked")
                 return True
             # first time: back up a step and jump forward through (over whoever stands there)
             e.log(f"stuck (1) · backing up and jumping through the door {edge_s}".rstrip())
