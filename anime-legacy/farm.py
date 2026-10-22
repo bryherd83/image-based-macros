@@ -356,14 +356,14 @@ class Farm:
                 self.boss.dungeon_finished()
             try:
                 g.log(f"dungeon time: {run.time_summary()}")
-                if run.turn_summary():
+                if getattr(run, "turn_summary", None) and run.turn_summary():
                     g.log(run.turn_summary())
             except Exception:
                 pass
             g.log(f"dungeon finished · {run.rooms_cleared} rooms cleared by the macro in {mins:.1f} min "
                   f"({done} cleared, {todo} left on the map)")
             try:
-                self.tuner.after(run.time_in, run.rooms_cleared, run.stucks_total)
+                self.tuner.after(run.time_in, run.rooms_cleared, getattr(run, "stucks_total", 0))
             except Exception as ex:  # noqa: BLE001
                 g.log(f"learning: skipped this dungeon ({ex})")
             g.shot("dungeon-finished", force=True)

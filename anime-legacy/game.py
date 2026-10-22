@@ -235,10 +235,10 @@ class Game:
         self.hwnd = None
         self.rect = None
         self.held = set()
-        self._sprint_on = settings.get("last_sprint_on")            # sprint: True/False once a dungeon has checked, None = unknown
+        self._sprint_on = None            # sprint: True/False once a dungeon has checked, None = unknown
         # on the mount: True/False once a dungeon has checked, None = unknown. The game keeps you
         # on it (also through teleports) until M is pressed again
-        self._mount_on = settings.get("last_mount_on")
+        self._mount_on = None
         self.zoom_hover = None
         self.info = {}
         self.last_rect_check = 0.0
