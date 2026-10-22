@@ -418,8 +418,6 @@ class DungeonRun:
         self.time_in: dict = {}        # seconds per activity this dungeon (for the log)
         self._say_t = None
         self.turn_settle = float(S.get("turn_settle_sec", 0.25))
-        self.turn_stats = {"n": 0, "sec": 0.0, "drags": 0, "fixed": 0}
-        self.stucks_total = 0
         self.lost_drags = 0            # drags in a row that didn't turn the camera at all
         self.no_route_since = None
         self.spawn_shortcut = bool(S.get("spawn_shortcut", True))   # press Spawn when quicker
@@ -454,9 +452,6 @@ class DungeonRun:
         self.last_here = None
         self.lineup = False
         self.centred = False
-        self.at_mid = False
-        self.mid_let_go = False
-        self.mid_taps = 0
         self.last_status = ""
         self.finished = False
         self.arrow_check = None
@@ -703,28 +698,6 @@ class DungeonRun:
                 pass
         self.env.cam_drag(px)
 
-    def _settled_arrow(self):
-        """The arrow once the camera has stopped moving after a drag: read every 60 ms until two
-        reads in a row agree (was a fixed 0.25 s wait; slow frames get a bit more time)."""
-        e = self.env
-        e.sleep(0.08)
-        last = e.arrow()
-        t0 = e.now()
-        while e.now() - t0 < self.turn_settle + 0.2:
-            e.sleep(0.06)
-            a = e.arrow()
-            if a is not None and last is not None and abs(wrap(a - last)) < 0.03:
-                return a
-            last = a
-        return last
-
-    def turn_summary(self):
-        ts = self.turn_stats
-        if not ts["n"]:
-            return ""
-        return (f"camera turns: {ts['n']}, {ts['sec'] / ts['n']:.1f}s each, "
-                f"{ts['drags'] / ts['n']:.1f} drags each, {100 * ts['fixed'] / ts['n']:.0f}% needed a correction")
-
     def face(self, target, edge, min_err=0.12):
         """Turn the camera to look along `target` (map angle). One drag, checked while walking."""
         h = self.head
@@ -734,19 +707,15 @@ class DungeonRun:
         if abs(d) < min_err:
             return
         self.stop()
-        t_start = self.env.now()
         a0 = self.env.arrow()
         px = round(d * h.k)
         self.say(f"turning the camera to face the door ({math.degrees(d):+.0f} deg)")
         self._drag(px)
         h.turned_by_mouse(px)
-        drags = 1
         if self.arrow_cam and a0 is not None:
             # check the turn on the arrow (Roblox drops part of a drag at a low frame rate) and
-            # correct it, at most twice; learn the mouse-to-turn ratio from every drag
+            # correct it, at most twice; learn the mouse-to-turn ratio from it
             for i in range(3):
-                # (fixed wait again: reading 'settled' as soon as two reads agreed caught the
-                # camera mid-turn on the laptop, 10-22: 5-23 stucks a dungeon vs 0-4 before)
                 self.env.sleep(self.turn_settle)
                 a1 = self.env.arrow()
                 if a1 is None:
@@ -767,12 +736,6 @@ class DungeonRun:
                     break
                 a0, px = a1, round(left * h.k)
                 self._drag(px)
-                drags += 1
-            ts = self.turn_stats
-            ts["n"] += 1
-            ts["sec"] += self.env.now() - t_start
-            ts["drags"] += drags
-            ts["fixed"] += drags > 1
             self.last_turn = (edge, self.env.now())
             self.turns_here += 1
             self.progress_ref = None        # (turning took a moment: not 'stuck')
@@ -799,7 +762,6 @@ class DungeonRun:
         e = self.env
         now = e.now()
         self.stuck_here += 1
-        self.stucks_total += 1
         if self.stuck_here >= 9 and now - self.last_spawn > 60 and e.press_spawn():
             # nothing works from here (trapped, or the map reading is off): start over from spawn
             e.log("stuck over and over in the same place · pressed Spawn")
@@ -980,9 +942,6 @@ class DungeonRun:
             if cell != self.cell:
                 self.cell, self.room_enter_t = cell, now
                 self.lineup = self.centred = False
-                self.at_mid = False
-                self.mid_let_go = False
-                self.mid_taps = 0
                 self.turns_here = 0
                 self.leave_t = None
                 self.stuck_here = 0
@@ -1164,9 +1123,7 @@ class DungeonRun:
                     continue
                 vx, vy = tx - fx, ty - fy
                 dc = math.hypot(vx, vy)
-                spd_c = self.head.nominal or float(S.get("walk_rooms_per_sec", 0.27))
-                in_r = max(0.05, spd_c * float(S.get("stop_lead_sec", 0.12)) * 1.5)
-                self.centred = dc <= (in_r + 0.05 if self.centred else in_r)
+                self.centred = dc <= (0.06 if self.centred else 0.03)
                 if self.centred:
                     self.stop()
                     self.say(f"{what} · {waited:.0f}s")
@@ -1190,46 +1147,7 @@ class DungeonRun:
                 # still looks the way you came in (so it's a straight walk, not a sidestep), then
                 # turn the camera to the door, then straight through. Lined up = within
                 # lineup_done, or just walked past the line (no stepping back for an overshoot)
-                middle_mode = S.get("middle_then_turn", True)
-                if middle_mode and not self.at_mid:
-                    # Blayne 10-22: "go into the room, stand in the middle, turn 90, go straight".
-                    # Walk to the middle (no sidestepping), let go early by the slide so it doesn't
-                    # shoot past (mount + laptop lag), stop, then turn and go straight
-                    # 10-22 15:00 fix: "in the middle" used the slide distance as its tolerance,
-                    # which on the mount (~1.4 rooms/s) is a quarter of a room - it stopped well off
-                    # the door's line, turned, and walked into the wall beside the door. Now: let go
-                    # early by the slide, wait for it to stop, then short taps to the real middle
-                    spd_m = self.head.nominal or float(S.get("walk_rooms_per_sec", 0.27))
-                    slide = max(0.06, spd_m * float(S.get("stop_lead_sec", 0.12)) * 1.5)
-                    mid_ok = float(S.get("middle_done", 0.06))
-                    d_mid = math.hypot(fx, fy)
-                    if d_mid <= mid_ok or (along >= 0.25 and abs(perp) <= lineup_done) \
-                            or self.mid_taps >= 6:
-                        self.at_mid = True
-                        self.stop()
-                        e.sleep(0.15)
-                        continue
-                    if not self.mid_let_go and d_mid <= slide:
-                        self.mid_let_go = True
-                        self.stop()
-                        e.sleep(0.3)                # let the slide finish, then look again
-                        self.progress_ref = None
-                        continue
-                    if self.mid_let_go:
-                        k = keys_for(-fx, -fy, self.head.psi)
-                        if k:
-                            self.mid_taps += 1
-                            ms = max(35, min(140, 0.6 * d_mid / max(spd_m, 0.05) * 1000))
-                            self.hold(k)
-                            e.sleep(ms / 1000)
-                            self.stop()
-                            e.sleep(float(S.get("mount_tap_pause_sec", 0.2)))
-                            self.progress_ref = None
-                            self.say(f"walking to the middle · {len(path) - 1} room(s) to go")
-                            continue
-                    vx, vy = -fx, -fy
-                    what = "walking to the middle"
-                elif not middle_mode and not self.lineup and abs(perp) > lineup_start and along < 0.3:
+                if not self.lineup and abs(perp) > lineup_start and along < 0.3:
                     self.lineup = math.copysign(1, perp)
                 # let go early by how far you still slide after letting go (fast on the mount,
                 # and the laptop sees the map late): stop_lead_sec of the current speed
@@ -1238,15 +1156,11 @@ class DungeonRun:
                 if self.lineup and (abs(perp) <= done_at or along >= 0.3
                                     or math.copysign(1, perp) != self.lineup):
                     self.lineup = False
-                if middle_mode and not self.at_mid:
-                    pass
-                elif not self.lineup and face_doors and self.turns_here < 6 and along < 0.42 and (
+                if not self.lineup and face_doors and self.turns_here < 6 and along < 0.42 and (
                         abs(yaw_err) > 0.35 or (abs(yaw_err) > self.turn_retol and self.head.confident)):
                     self.face(want, (path[0], path[1]), min_err=min(0.12, 0.9 * self.turn_retol))
                     continue
-                if middle_mode and not self.at_mid:
-                    pass
-                elif self.lineup:
+                if self.lineup:
                     # step sideways onto the door's centre line (not back to the middle)
                     vx, vy = (0.0, -fy) if nx else (-fx, 0.0)
                     if getattr(e, "mount_on", None) and self.mount and S.get("mount_lineup_taps", True):
