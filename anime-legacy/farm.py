@@ -29,6 +29,7 @@ from dungeon import DungeonRun
 from game import Game, load_settings, save_settings
 from reconnect import Watchdog
 from trial import run_trial
+from worldboss import WorldBoss
 
 HOTKEYS = {0x74: "F5", 0x75: "F6", 0x76: "F7", 0x77: "F8", 0x78: "F9", 0x79: "F10"}
 
@@ -132,6 +133,7 @@ class Farm:
     def loop(self):
         g = self.game
         culling = Culling(g)
+        self.boss = WorldBoss(g, culling)
         try:
             while self.running:
                 try:
@@ -290,6 +292,8 @@ class Farm:
                     g.status("trial finished")
                     g.log("trial finished")
                 return
+        if self.boss.tick(f):
+            return
         if mode == "dungeon":
             culling.waiting_room(f)
             return
@@ -318,6 +322,8 @@ class Farm:
         mins = (time.monotonic() - t0) / 60
         if finished:
             self.dungeon_saved = None
+            if getattr(self, "boss", None):
+                self.boss.dungeon_finished()
             try:
                 g.log(f"dungeon time: {run.time_summary()}")
             except Exception:
@@ -528,9 +534,12 @@ class App:
         self.mount_var = tk.BooleanVar(value=bool(self.S.get("ride_mount", True)))
         ttk.Checkbutton(w, text="Ride the mount (M) in dungeons",
                         variable=self.mount_var, command=self._picked).grid(row=6, column=0, columnspan=3, **pad)
+        self.boss_var = tk.BooleanVar(value=bool(self.S.get("world_boss", False)))
+        ttk.Checkbutton(w, text="World boss at the top of every hour (Map 4), then back to Map 5",
+                        variable=self.boss_var, command=self._picked).grid(row=7, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
-            row=7, column=0, padx=12, pady=10, sticky="w")
-        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=7, column=1, columnspan=2,
+            row=8, column=0, padx=12, pady=10, sticky="w")
+        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=8, column=1, columnspan=2,
                                                                                sticky="w")
         self.settings_win = w
         w.withdraw()
@@ -539,6 +548,7 @@ class App:
         self.S["mode"] = self.mode_var.get()
         self.S["join_trials"] = bool(self.trial_var.get())
         self.S["ride_mount"] = bool(self.mount_var.get())
+        self.S["world_boss"] = bool(self.boss_var.get())
         try:
             self.S["trial_leave_after"] = int(self.leave_var.get())
         except ValueError:

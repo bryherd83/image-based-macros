@@ -37,6 +37,9 @@ DEFAULTS = {
     # dungeons: ride the mount (moves like running, only faster - Blayne). F5 has a box. (The
     # circles on 10-19 15:32 came from a wall next to your room read as a door, not the mount.)
     "ride_mount": True,
+    # world boss at the top of every hour (Map 4 Sins Kingdom), after the :00 dungeon; back to
+    # Map 5 Dragon City afterwards. F5 has a box
+    "world_boss": False,
     "mount_off_below": 0.5,             # moving slower than this share of mount speed = off it
     "spawn_shortcut": True,             # press Spawn when walking from the blue room is quicker
     "spawn_shortcut_rooms": 3.0,        # what pressing Spawn costs, in rooms of walking

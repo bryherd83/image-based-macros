@@ -244,13 +244,14 @@ class Culling:
     def open_culling(self, f):
         self.open_card(f, "dice", "Culling Game", "Cursed Academy's dice")
 
-    def open_card(self, f, icon, what, where):
-        """Worlds menu -> scroll to the card with `icon` -> click it."""
+    def open_card(self, f, icon, what, where, click_below=0):
+        """Worlds menu -> scroll to the card with `icon` -> click it (or, with click_below, the
+        spot that many px (at 1080p) below it: a card title's Teleport button). True if clicked."""
         e = self.env
         w = e.find("worlds", f)
         if w is None:
             e.status("can't see the Worlds button")
-            return
+            return False
         opened = False
         for how in ("key", "click"):
             if how == "key":
@@ -267,7 +268,7 @@ class Culling:
                 break
         if not opened:                          # don't scroll with no menu (it would zoom the camera)
             e.status("Worlds menu didn't open · retrying")
-            return
+            return False
         W, H = e.size()
         # Roblox only scrolls a menu after it has 'felt' the mouse on it
         e.click(W // 2, round(H * 0.215), park=False)
@@ -277,16 +278,20 @@ class Culling:
                 fr = e.frame()
                 d = e.find(icon, fr)
                 if d:
-                    e.click(*d)
+                    if click_below:
+                        e.click(d[0], d[1] + round(click_below * H / 1080))
+                    else:
+                        e.click(*d)
                     self.last_nav = e.now()
                     e.status(f"opened {what}")
                     e.log(f"opened {what}")
-                    return
+                    return True
                 if e.find("close", fr) is None:   # menu closed somehow: stop scrolling
-                    return
+                    return False
                 e.scroll(notch)
                 e.sleep(0.3)
         e.status(f"couldn't find {where} · retrying")
         c = e.find("close")
         if c:
             e.close_menu(*c)
+        return False

@@ -22,6 +22,9 @@ ASSETS = os.path.join(HERE, "assets")
 REGIONS = {
     "worlds": ((0.00, 0.40, 0.25, 0.80), 70),
     "dice": ((0.00, 0.00, 1.00, 1.00), 70),
+    # Teleport menu card titles (world boss trip: Map 4 Sins Kingdom, back to Map 5 Dragon City)
+    "sinskingdom": ((0.25, 0.15, 0.95, 0.75), 70),
+    "dragoncity": ((0.25, 0.15, 0.95, 0.75), 70),
     "create": ((0.00, 0.00, 1.00, 1.00), 70),
     "play": ((0.00, 0.00, 1.00, 1.00), 70),
     "close": ((0.70, 0.08, 0.92, 0.38), 100),
