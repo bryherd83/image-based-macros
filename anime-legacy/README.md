@@ -87,7 +87,7 @@ you may want to change:
 | `alt_dungeon_max_sec` | `900` | Alt mode: press Leave if a dungeon is still going after this long |
 | `hueco_leave_after` | `10` | Hueco Mundo: press Leave once this wave is cleared (F5 box) |
 | `hueco_leave_for_popups` | `true` | Hueco Mundo: join the Dungeon / Trial popups (that ends the run). `false` = finish the run first (F5 box) |
-| `hueco_not_before_popup_sec` | `300` | Hueco Mundo (with the above on): don't start a run when a popup is due this soon |
+| `hueco_not_before_popup_sec` | `300` | Hueco Mundo: don't start a run when a popup is due this soon |
 | `hueco_mount` | `true` | Ride the mount in Hueco Mundo (follows the F5 mount box) |
 | `join_trials` | `true` | Join the Trial popup |
 | `trial_leave_after` | `27` | Leave the trial after this wave |

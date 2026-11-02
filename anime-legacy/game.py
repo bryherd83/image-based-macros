@@ -84,7 +84,7 @@ DEFAULTS = {
     # Hueco Mundo (mode "hueco", hueco.py)
     "hueco_leave_after": 10,           # press Leave once this wave is cleared
     "hueco_leave_for_popups": True,    # join Dungeon / Trial popups (leaves the run); False = finish first
-    "hueco_not_before_popup_sec": 300,  # (with that on) don't start a run this close to a popup
+    "hueco_not_before_popup_sec": 300,  # don't start a run this close to a popup
     "hueco_mount": True,               # ride the mount (M) there
     "hueco_spawn_shortcut": True,      # press Spawn when walking from spawn is quicker
 }

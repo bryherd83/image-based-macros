@@ -90,7 +90,7 @@ class FakeGame:
         self.lines.append("(screenshot)")
 
 
-def run(game, clock, ticks=60):
+def run(game, clock, ticks=60, tick="defense_tick"):
     c = culling.Culling(game)
     real = culling.dt.datetime
 
@@ -103,7 +103,7 @@ def run(game, clock, ticks=60):
         for _ in range(ticks):
             if game.state == "defense":
                 break
-            c.defense_tick(game)
+            getattr(c, tick)(game)
             game.t += 0.5
     finally:
         culling.dt.datetime = real
@@ -130,6 +130,19 @@ g = FakeGame()
 run(g, dt.datetime(2026, 10, 17, 17, 9, 0))
 print("2b: 6 min before ->", g.state)
 assert g.state == "defense"
+
+# 2c. Hueco Mundo holds off the same way, whether or not it leaves for popups (11-01 19:14:20 started
+#     2.5 min before a trial with leaving off, and that trial was missed)
+for leave in (True, False):
+    g = FakeGame()
+    g.settings["hueco_leave_for_popups"] = leave
+    run(g, dt.datetime(2026, 10, 17, 17, 11, 0), ticks=40, tick="hueco_tick")
+    assert g.state == "lobby" and not g.clicks, (leave, g.clicks)
+    g = FakeGame()
+    g.settings["hueco_leave_for_popups"] = leave
+    run(g, dt.datetime(2026, 10, 17, 17, 5, 0), ticks=40, tick="hueco_tick")
+    assert g.clicks, leave
+print("2c: Hueco Mundo holds off near a popup: ok")
 
 # 3. the key never opens Defense: it backs off to once every 2 minutes and says so once
 g = FakeGame(key_works=False)

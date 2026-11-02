@@ -162,8 +162,7 @@ class Culling:
         self.nav_clicks = {}
         self.hold_until = self.env.now() + float(self.env.settings.get("after_join_hold_sec", 25))
 
-    def defense_tick(self, f, icon="key", what="Defense", where="Dragon City's key", prefix="defense",
-                     not_before=None):
+    def defense_tick(self, f, icon="key", what="Defense", where="Dragon City's key", prefix="defense"):
         """Mode 'defense', not in a run: open Defense (Worlds menu -> Dragon City's key ->
         Create -> Play) unless a Dungeon / Trial popup is due soon. Dungeons and trials are
         joined from their popups by farm.tick, also from inside Defense.
@@ -219,10 +218,8 @@ class Culling:
                 return
             e.status(f"{what}: starting...")
             return
-        if not_before is None:
-            not_before = float(S.get(f"{prefix}_not_before_popup_sec", 300))
-        if due_in < not_before:
-            self.waiting_room(f)                  # a popup comes in a moment: just wait for it
+        if due_in < float(S.get(f"{prefix}_not_before_popup_sec", 300)):
+            self.waiting_room(f)                 # a popup comes in a moment: just wait for it
             return
         c = e.find("close", f)
         if c and not navigating:                  # a menu we didn't open (e.g. the Defense
@@ -247,12 +244,11 @@ class Culling:
 
     def hueco_tick(self, f):
         """Mode 'hueco', not in a run: open Hueco Mundo (Teleport menu -> Soul Society's purple key
-        -> Create -> Play). With hueco_leave_for_popups on, not when a Dungeon / Trial popup is
-        due within hueco_not_before_popup_sec (the run would be cut short)."""
-        S = self.env.settings
-        nb = float(S.get("hueco_not_before_popup_sec", 300)) if S.get("hueco_leave_for_popups", True) else 0.0
+        -> Create -> Play). Not when a Dungeon / Trial popup is due within
+        hueco_not_before_popup_sec, also with hueco_leave_for_popups off: a run started 19:14:20 on
+        11-01 was still going when the 19:16:44 trial popped up, so that trial was missed."""
         return self.defense_tick(f, icon="hmkey", what="Hueco Mundo", where="Soul Society's purple key",
-                                 prefix="hueco", not_before=nb)
+                                 prefix="hueco")
 
     def open_culling(self, f):
         self.open_card(f, "dice", "Culling Game", "Cursed Academy's dice")
