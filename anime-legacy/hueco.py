@@ -77,8 +77,8 @@ def is_hueco(frame, castle=None) -> bool:
 
 
 def in_run(frame, castle, wave) -> bool:
-    """Still in the run you were in. The map alone can't say: it went dark on the wave 11 banner
-    (0.7% lavender) and the run counted as over, so it never left (11-02 12:25:40)."""
+    """Still in the run you were in. The map alone can't say: a run card turns it dark (0.7%
+    lavender) and the run counted as over, so it never left (11-02 12:25:40)."""
     if castle is None:
         return False
     return is_hueco(frame, castle) or \
@@ -571,6 +571,9 @@ class HuecoRun:
                 if now - self.card_t > 3:
                     self.card_t = now
                     i, why = pick_card(f, self.cards)
+                    # (a picture of each vote: a card that hides the map got picked and no vote
+                    # screen showed its name, 11-02 13:43:38)
+                    e.shot("hueco-card-vote", force=True)
                     e.tap(str(i), 60)
                     e.log(f"Hueco Mundo: card vote · picked card {i} ({why})")
                     self.say(f"choosing a card ({i})")

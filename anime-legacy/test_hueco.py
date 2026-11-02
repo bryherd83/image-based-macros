@@ -297,7 +297,7 @@ def patch():
     hueco.red_near = lambda f, pos, r=11: 100 if any(math.hypot(s[0] - pos[0], s[1] - pos[1]) < 3 for s in f.skulls) else 0
 
 
-# the map went dark on the wave 11 banner: still in the run, so it leaves (11-02 12:25:40). Back in
+# a run card turned the map dark: still in the run, so it leaves (11-02 12:25:40). Back in
 # the lobby it's over
 f = cv2.imread(os.path.join(HERE, "testdata", "hueco", "dark-map-wave11.jpg"))
 c = hud.castle_x(f)
