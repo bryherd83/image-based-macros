@@ -46,11 +46,25 @@ if os.path.isdir(SHOTS):
         assert len(m.skulls) == n, (name, m.skulls)
         want_arrow = {"s114.png": -math.pi / 2, "s115.png": math.radians(45), "rim2.jpg": 0.84,
                       "rim1.jpg": math.pi}.get(name, math.pi / 2)
-        assert all(math.hypot(*sk) <= 92.5 for sk in m.skulls), (name, m.skulls)      # walkable
         if name == "s117.png":
             want_arrow = math.radians(84)
         if name != "s116.png":
             assert m.arrow is not None and abs(hueco.wrap(m.arrow - want_arrow)) < 0.25, (name, m.arrow)
+    # out by the rim (11-02 08:25-08:27). A skull's real middle, not a spot short of it: stopping
+    # at 92 px left 0 DPS with enemies alive
+    f = cv2.imread(os.path.join(SHOTS, "rim2.jpg"))
+    if f is not None:
+        m = hueco.read_map(f)
+        for want in ((-96, -34), (24, 98)):
+            assert any(math.hypot(sk[0] - want[0], sk[1] - want[1]) < 3 for sk in m.skulls), m.skulls
+    # your arrow dimmed 100 px out: found if you were last seen near there, and only then (the
+    # mouse pointer looks just like it)
+    f = cv2.imread(os.path.join(SHOTS, "rim-dimarrow.jpg"))
+    if f is not None:
+        m = hueco.read_map(f, prev=(-86, -31))
+        assert m.player is not None and math.hypot(m.player[0] + 95, m.player[1] + 33) < 3, m.player
+        assert hueco.read_map(f).player is None
+        assert hueco.read_map(f, prev=(40, 40)).player is None
     # your arrow on the very middle of a skull (made from s109: arrow moved onto a skull): you're
     # found there, and the skull still counts as there (red round the arrow) until it's a check
     f = cv2.imread(os.path.join(SHOTS, "onskull.png"))
@@ -282,6 +296,16 @@ def patch():
     hueco.red_near = lambda f, pos, r=11: 100 if any(math.hypot(s[0] - pos[0], s[1] - pos[1]) < 3 for s in f.skulls) else 0
 
 
+# the map went dark on the wave 11 banner: still in the run, so it leaves (11-02 12:25:40). Back in
+# the lobby it's over
+f = cv2.imread(os.path.join(HERE, "testdata", "hueco", "dark-map-wave11.jpg"))
+c = hud.castle_x(f)
+assert not hueco.is_hueco(f, c) and hueco.in_run(f, c, 10) and hueco.read_wave(f, c) == 11
+assert not hueco.in_run(f, c, None)
+f = cv2.imread(os.path.join(HERE, "testdata", "hueco", "run-ended-lobby.jpg"))
+assert not hueco.in_run(f, hud.castle_x(f), 8)
+print("still in the run: ok")
+
 patch()
 results = []
 for seed in range(1, 9):
@@ -301,14 +325,21 @@ assert hueco.HuecoRun(env).run() == "left" and env.presses == 0 and w.mounted
 w = World(10, mounted=True)
 env = Env(w)
 assert hueco.HuecoRun(env).run() == "left" and env.presses == 2 and w.mounted
-# the camera drag often doesn't take (right button missed): still gets through every wave
-for seed in (31, 32, 33):
-    w = World(seed, drag_fail=0.5)
-    env = Env(w)
-    res = hueco.HuecoRun(env).run()
-    assert res == "left" and w.left_at in (10, 11), (seed, res, w.left_at, env.logs[-5:])
-    print(f"drags failing half the time, seed {seed}: left at wave {w.left_at} · {w.t / 60:.1f} min · "
-          f"{w.lost_drags} drags lost")
+# walks with W/A/S/D as the camera looks: no camera drags at all
+assert w.lost_drags == 0 and "Hueco time: " in " ".join(env.logs), env.logs[-3:]
+# the last mode said "on the mount" but it isn't (11-02 12:02:24): noticed once, and it gets on
+w = World(11, mounted=False)
+env = Env(w, {"hueco_speed_px_s": 80.0})
+env.mount_on = True
+assert hueco.HuecoRun(env).run() == "left" and w.mounted and env.presses == 1, env.presses
+# shuffling a little after each jump still counts toward pressing Spawn (11-02 12:16:30: 52 s)
+w = World(12)
+run = hueco.HuecoRun(Env(w))
+for i in range(8):
+    run.progress = (w.t - 1.0, 0.0, 0.0)
+    run.stuck_check(w.t, 0.0, 0.0)
+    run.stuck_check(w.t, 5.0, 0.0)              # (moved: the old count started again here)
+assert w.spawns == 1, w.spawns
 # your arrow can't be seen, at spawn or out by the rim: it steps until it can (it stood still until
 # the run was lost, 11-01 18:42 and 18:44-19:27)
 for kw in ({"hide_spawn": True}, {"hide_beyond": 88}):
