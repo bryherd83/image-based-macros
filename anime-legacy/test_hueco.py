@@ -114,7 +114,7 @@ class World:
                  drag_fail=0.0, hide_spawn=False, hide_beyond=None):
         self.aura = aura
         self.hide_spawn, self.hide_beyond = hide_spawn, hide_beyond
-        self.drag_fail, self.lost_drags = drag_fail, 0
+        self.drag_fail, self.lost_drags, self.drags = drag_fail, 0, 0
         self.rng = random.Random(seed)
         self.t = 0.0
         self.x, self.y = -1.0, -1.0
@@ -221,6 +221,7 @@ class Env:
         self.sleep(ms / 1000)
 
     def cam_drag(self, px, slow=False):
+        self.w.drags += 1
         # Roblox sometimes misses the right-button press: the mouse slides, the camera stays
         # (11-01 18:21). The careful (slow) drag gets through far more often
         fail = self.w.drag_fail * (0.2 if slow else 1.0)
@@ -336,15 +337,9 @@ env = Env(w)
 run = hueco.HuecoRun(env)
 assert run.run() == "left" and env.presses == 0 and w.mounted
 assert run.speed < 110, run.speed             # (80 here. A walk counted as a tap: 119 in game, 11-02 13:01)
-# the camera drag often doesn't take (right button missed): still gets through every wave
-for seed in (31, 32, 33):
-    w = World(seed, drag_fail=0.5)
-    env = Env(w)
-    res = hueco.HuecoRun(env).run()
-    assert res == "left" and w.left_at in (10, 11), (seed, res, w.left_at, env.logs[-5:])
-    print(f"drags failing half the time, seed {seed}: left at wave {w.left_at} · {w.t / 60:.1f} min · "
-          f"{w.lost_drags} drags lost")
-assert "Hueco time: " in " ".join(env.logs), env.logs[-3:]
+# walks without turning the camera: no drags at all (131 s of a 7.7 min run, 11-02 13:24:50)
+assert w.drags == 0 and "Hueco time: " in " ".join(env.logs), (w.drags, env.logs[-3:])
+assert "turning" not in " ".join(env.logs)
 # shuffling a little after each jump still counts toward pressing Spawn (11-02 12:16:30: 52 s)
 w = World(12)
 run = hueco.HuecoRun(Env(w))

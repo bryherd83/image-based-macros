@@ -9,9 +9,9 @@ waves 5 / 10 a "CHOOSE A CARD" vote (keys 1 / 2 / 3). The macro leaves after hue
 (10) waves.
 
 Movement works like the dungeon's: your white arrow on the map shows where the CAMERA looks
-(arrow_is_camera), so it turns the camera toward the skull with a right-mouse drag and walks with
-W (the way a mount moves well). Pressing Spawn is used when walking back from spawn is quicker.
-Not moving although W is held (a rock in the way) = jump, then step around it.
+(arrow_is_camera), so it walks toward the skull with W/A/S/D as the camera looks, without turning
+the camera. Pressing Spawn is used when walking back from spawn is quicker.
+Not moving although keys are held (a rock in the way) = jump, then step around it.
 
 Everything that reads the screen takes a BGR frame of the 1920x1080 client area, so it can be
 tested on screenshots (test_hueco.py).
@@ -459,9 +459,6 @@ class HuecoRun:
         self.S = env.settings
         S = self.S
         self.leave_after = int(S.get("hueco_leave_after", 10))
-        self.k = float(S.get("cam_px_per_rad", 584))
-        if not 60 <= abs(self.k) <= 4000:
-            self.k = 584.0
         self.speed = float(S.get("hueco_speed_px_s", 0) or 0)      # map px per second (learned)
         self.walk_speed = self.speed    # the same from straight stretches only (taps read high)
         self.prev = None
@@ -473,8 +470,6 @@ class HuecoRun:
         self.wave_t = env.now()
         self.unseen_logged = None
         self.last_arrow = None
-        self.lost_drags = 0             # camera drags in a row that didn't turn it
-        self.no_turn_until = -1e9
         self.at_target_since = None
         self.last_kill_t = env.now()
         self.en_text = None
@@ -493,7 +488,7 @@ class HuecoRun:
         self.unstick_keys = set()
         self.keys = set()
         self.last_status = ""
-        self.sample = None              # (t, x, y) start of a W-only stretch (speed)
+        self.sample = None              # (t, x, y) start of a straight stretch (speed)
         self.doing = "other"            # what the time since the last loop went on
         self.spent: dict = {}
         self.tick_t = env.now()
@@ -537,51 +532,6 @@ class HuecoRun:
     def step_sec(self, px):
         """How long to hold a key to move about `px` map pixels."""
         return max(0.12, min(0.6, px / (self.speed or 25.0)))
-
-    # ---- the camera ----
-    def turn_to(self, want, arrow):
-        """Right-mouse drag to look along map angle `want`, checked on the arrow."""
-        e = self.env
-        d = wrap(want - arrow)
-        self.stop()
-        self.say(f"turning the camera toward the spot ({math.degrees(d):+.0f} deg)")
-        for _ in range(3):
-            px = round(max(-1.6, min(1.6, d)) * self.k)
-            # after a drag that didn't turn the camera (Roblox missed the right-button press and
-            # the mouse just slid across the screen, Blayne 11-01 18:21): the careful kind - a
-            # separate right click first, a longer hold, smaller steps
-            try:
-                e.cam_drag(px, slow=self.lost_drags > 0)
-            except TypeError:
-                e.cam_drag(px)
-            e.sleep(0.25)
-            f = e.frame()
-            m = read_map(f, self.prev) if f is not None else None
-            if m is None or m.arrow is None:
-                return
-            turned = wrap(m.arrow - arrow)
-            if abs(px) > 100:
-                if abs(turned) < 0.05:
-                    self.lost_drags += 1
-                    if self.lost_drags >= 2:
-                        # twice in a row: stop turning for a while and walk there with W/A/S/D
-                        # relative to wherever the camera looks
-                        self.no_turn_until = e.now() + 10
-                        e.log("Hueco Mundo: the camera didn't turn on 2 drags in a row · walking "
-                              "without turning for 10s")
-                        self.lost_drags = 0
-                        return
-                else:
-                    self.lost_drags = 0
-            if abs(px) > 150 and abs(turned) > 0.4:
-                k = px / turned
-                if 60 <= abs(k) <= 4000 and abs(self.k) / 2 <= abs(k) <= 2 * abs(self.k) and (k > 0) == (self.k > 0):
-                    self.k = 0.7 * self.k + 0.3 * k
-                    e.save_setting("cam_px_per_rad", round(self.k), quiet=True)
-            arrow = m.arrow
-            d = wrap(want - arrow)
-            if abs(d) < 0.12:
-                return
 
     # ---- main loop ----
     def run(self):
@@ -906,7 +856,8 @@ class HuecoRun:
         return True
 
     def walk(self, now, pos, tgt, m, close=False):
-        """One step toward `tgt` (map px): face it, then W (short taps when close)."""
+        """One step toward `tgt` (map px) with W/A/S/D as the camera looks (short taps when close).
+        No camera turns: they took 131 s of a 7.7 min run (11-02 13:24:50)."""
         e = self.env
         px, py = pos
         vx, vy = tgt[0] - px, tgt[1] - py
@@ -924,20 +875,7 @@ class HuecoRun:
             e.sleep(0.1)
             return
         self.heading = (want, m.arrow)
-        err = wrap(want - m.arrow)
         near = d < NEAR_PX or close
-        if not near and abs(err) > 0.35 and now < self.no_turn_until:
-            # the camera won't turn right now: walk there with W/A/S/D as it is
-            self.last_tap = None
-            self.hold(keys_for(vx, vy, m.arrow) or {"w"})
-            e.sleep(0.05)
-            self.stuck_check(now, px, py)
-            return
-        if not near and abs(err) > 0.35:
-            self.doing = "turning"
-            self.turn_to(want, m.arrow)
-            self.progress = self.sample = None
-            return
         if near:
             self.doing = "last steps"
             # close: a tap sized to the distance, so it stops on the spot. Taps that don't get it
@@ -976,8 +914,8 @@ class HuecoRun:
         # (what a tap goes on from here would count this walk: 119 px/s, so taps too short to move
         # you and "not getting closer" all run, 11-02 13:01:19)
         self.last_tap = None
-        self.hold({"w"})
-        # speed (W only, going straight): the Spawn shortcut uses it. Only a
+        self.hold(keys_for(vx, vy, m.arrow) or {"w"})
+        # speed (going straight): the Spawn shortcut uses it. Only a
         # stretch walked without a break (a fight or a turn in between made it look slow)
         if now - self.last_walk > 0.4:
             self.sample = None
@@ -989,8 +927,8 @@ class HuecoRun:
             dx, dy = px - x0, py - y0
             sp = math.hypot(dx, dy) / (now - t0)
             self.sample = None
-            # a clean stretch: no rock hit, and going the way the camera looks (not scraping along)
-            if sp > 3 and st0 == self.stucks and abs(wrap(math.atan2(dy, dx) - m.arrow)) < 0.4:
+            # a clean stretch: no rock hit, and going the way it should (not scraping along)
+            if sp > 3 and st0 == self.stucks and abs(wrap(math.atan2(dy, dx) - want)) < 0.6:
                 # (the mount is yours to get on before the run: the macro's M presses, judged by
                 # speed, got you off it, 11-02 13:19:12)
                 if sp > 0.6 * (self.walk_speed or sp):
