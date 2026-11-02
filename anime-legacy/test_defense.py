@@ -11,6 +11,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import culling  # noqa: E402
+import hud  # noqa: E402
 
 
 class FakeGame:
@@ -143,6 +144,19 @@ for leave in (True, False):
     run(g, dt.datetime(2026, 10, 17, 17, 5, 0), ticks=40, tick="hueco_tick")
     assert g.clicks, leave
 print("2c: Hueco Mundo holds off near a popup: ok")
+# 2d. only Hueco Mundo ticked: no holding off for popups it won't join, and the popups it wants say
+#     so (joined dungeons between runs, 11-02 13:00:03)
+from culling import popup_kinds  # noqa: E402
+assert popup_kinds({"mode": "hueco", "hueco_leave_for_popups": False, "join_trials": False}) == ()
+assert popup_kinds({"mode": "hueco", "hueco_leave_for_popups": False, "join_trials": True}) == ("trial",)
+assert popup_kinds({"mode": "hueco", "hueco_leave_for_popups": True, "join_trials": False}) == ("dungeon",)
+assert popup_kinds({"mode": "dungeon", "join_trials": True}) == ("dungeon", "trial")
+assert popup_kinds({"mode": "culling", "join_trials": False}) == ()
+g = FakeGame()
+g.settings.update(mode="hueco", hueco_leave_for_popups=False, join_trials=False)
+run(g, dt.datetime(2026, 10, 17, 17, 11, 0), ticks=40, tick="hueco_tick")
+assert g.clicks, "held off for a popup it won't join"
+print("2d: Hueco Mundo only: ok")
 
 # 3. the key never opens Defense: it backs off to once every 2 minutes and says so once
 g = FakeGame(key_works=False)
@@ -155,7 +169,7 @@ assert g.state != "defense" and tries <= 6 and sum("couldn't open it 4 times" in
 #    pressed after joining and it went to Defense instead of the dungeon)
 g = FakeGame()
 g.popup_up = False
-g.popup = lambda: (1, 1) if g.popup_up else None
+g.popup = lambda: hud.Popup("dungeon", 1, 1) if g.popup_up else None
 c = culling.Culling(g)
 real = culling.dt.datetime
 clock = dt.datetime(2026, 10, 17, 17, 5, 0)
@@ -189,7 +203,6 @@ print("defense: ok")
 import cv2  # noqa: E402
 import time  # noqa: E402
 import farm  # noqa: E402
-import hud  # noqa: E402
 
 shot = cv2.imread(os.path.join(HERE, "testdata", "screens", "laptop-1017-defense-run.png"))
 print("4: wave read", hud.read_counter(shot, "wave", bx=hud.DEFENSE_WAVE_X))

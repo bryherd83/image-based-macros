@@ -37,6 +37,13 @@ def next_popup(kinds, now=None, offset=DEFAULT_OFFSET):
     return best
 
 
+def popup_kinds(S):
+    """The popups the F5 boxes ask for. Hueco Mundo with its popup box off means only Hueco Mundo:
+    it still joined every Dungeon popup between runs (11-02 12:01:46, 13:00:03)."""
+    hueco_only = S.get("mode") == "hueco" and not S.get("hueco_leave_for_popups", True)
+    return (("dungeon",) if S.get("mode") != "culling" and not hueco_only else ()) +         (("trial",) if S.get("join_trials") else ())
+
+
 class Culling:
     def __init__(self, env):
         self.env = env
@@ -77,7 +84,7 @@ class Culling:
         if c:
             e.close_menu(*c)
             return
-        kind, t = next_popup(("dungeon", "trial") if e.settings.get("join_trials") else ("dungeon",),
+        kind, t = next_popup(popup_kinds(e.settings) or ("dungeon",),
                              offset=float(e.settings.get("popup_offset_sec", DEFAULT_OFFSET)))
         left = max(0, int((t - dt.datetime.now()).total_seconds()))
         e.status(f"waiting · next: {kind} popup at {t:%H:%M:%S} (in {left // 60}:{left % 60:02d})")
@@ -172,16 +179,17 @@ class Culling:
         now = e.now()
         if isinstance(getattr(e, "info", None), dict):
             e.info["run"] = "-"
-        kind, t = next_popup(("dungeon", "trial") if S.get("join_trials") else ("dungeon",),
-                             offset=float(S.get("popup_offset_sec", DEFAULT_OFFSET)))
-        due_in = (t - dt.datetime.now()).total_seconds()
+        kinds = popup_kinds(S)
+        kind, t = next_popup(kinds or ("dungeon",), offset=float(S.get("popup_offset_sec", DEFAULT_OFFSET)))
+        due_in = (t - dt.datetime.now()).total_seconds() if kinds else float("inf")
         if now < getattr(self, "hold_until", 0):
             e.status("joined a popup · waiting for it to load")
             return
         just_started = self.last_start and now - self.last_start < 45
         navigating = self.last_nav and now - self.last_nav < 15
         popup = getattr(e, "popup", None)
-        if navigating and popup and popup() is not None:
+        pop = popup() if navigating and popup else None
+        if pop is not None and pop.kind in kinds:
             return                                # a popup is up: it gets joined, not Defense
         if not just_started and navigating:
             for name, msg in (("play", "pressed Play"), ("create", "pressed Create"), (icon, f"opened {what}")):
@@ -232,7 +240,8 @@ class Culling:
         fails = getattr(self, "def_fails", 0)
         wait = 8 if fails < 4 else 120            # keeps failing: try again every 2 minutes
         if now - self.last_open_try < wait:
-            e.status(f"{what}: next try in {wait - (now - self.last_open_try):.0f}s · next {kind} popup at {t:%H:%M:%S}")
+            e.status(f"{what}: next try in {wait - (now - self.last_open_try):.0f}s"
+                     + (f" · next {kind} popup at {t:%H:%M:%S}" if kinds else ""))
             return
         self.last_open_try = now
         self.def_fails = fails + 1

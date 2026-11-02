@@ -25,7 +25,7 @@ import hueco
 import logsend
 import minimap as mm
 import winio
-from culling import DEFAULT_OFFSET, Culling, next_popup, popup_offset
+from culling import DEFAULT_OFFSET, Culling, next_popup, popup_kinds, popup_offset
 from dungeon import DungeonRun
 from hueco import HuecoRun
 from game import Game, load_settings, save_settings
@@ -187,7 +187,7 @@ class Farm:
         log line if none was joined within a minute - so a missed popup leaves evidence
         (laptop 10-15: no 23:00 dungeon, nothing in the log to say why)."""
         S = self.S
-        kinds = (("dungeon",) if mode != "culling" else ()) + (("trial",) if S["join_trials"] else ())
+        kinds = popup_kinds(S)
         if not kinds:
             return
         now = dt.datetime.now()
@@ -246,13 +246,14 @@ class Farm:
         # ---- Dungeon / Trial popup: press its green check
         # in a Hueco Mundo run that isn't to be left for popups: leave them alone
         in_hueco = mode == "hueco" and g.find("roomhud", f) is not None and hueco.is_hueco(f)
-        if (mode != "culling" or S["join_trials"]) and not (in_hueco and not S.get("hueco_leave_for_popups", True)):
+        kinds = popup_kinds(S)
+        if kinds and not (in_hueco and not S.get("hueco_leave_for_popups", True)):
             pop = hud.find_popup(f)
             if pop and time.monotonic() - getattr(self, "_join_t", -1e9) < 4:
                 pop = None          # just clicked one: it's closing (clicked twice before, 11-01)
             if pop and pop.kind == "trial" and g.find("roomhud", f) and hud.has_minimap(f):
                 pop = None          # still in a dungeon: run_dungeon decides (finish it unless stuck)
-            if pop and ((pop.kind == "dungeon" and mode != "culling") or (pop.kind == "trial" and S["join_trials"])):
+            if pop and pop.kind in kinds:
                 g.release_all()
                 g.click(pop.x, pop.y)
                 g.status(f"joining the {pop.kind}")
@@ -662,7 +663,7 @@ class App:
         ttk.Entry(w, textvariable=self.hm_leave_var, width=5).grid(row=5, column=2, padx=4, sticky="w")
         self.hm_leave_var.trace_add("write", lambda *a: self._picked())
         self.hm_pop_var = tk.BooleanVar(value=bool(self.S.get("hueco_leave_for_popups", True)))
-        ttk.Checkbutton(w, text="      Leave Hueco Mundo for Dungeon / Trial popups (off = finish the run first)",
+        ttk.Checkbutton(w, text="      Also join Dungeons, and leave Hueco Mundo for popups (off = no Dungeons)",
                         variable=self.hm_pop_var, command=self._picked).grid(row=7, column=0, columnspan=3, **pad)
         self.trial_var = tk.BooleanVar(value=self.S["join_trials"])
         ttk.Checkbutton(w, text="Also join Trials when they pop up, and leave after wave", variable=self.trial_var,
@@ -672,7 +673,7 @@ class App:
         e.grid(row=8, column=2, padx=4, sticky="w")
         self.leave_var.trace_add("write", lambda *a: self._picked())
         self.mount_var = tk.BooleanVar(value=bool(self.S.get("ride_mount", True)))
-        ttk.Checkbutton(w, text="Ride the mount (M) in dungeons and Hueco Mundo",
+        ttk.Checkbutton(w, text="Ride the mount (M) in dungeons",
                         variable=self.mount_var, command=self._picked).grid(row=9, column=0, columnspan=3, **pad)
         self.boss_var = tk.BooleanVar(value=bool(self.S.get("world_boss", False)))
         ttk.Checkbutton(w, text="World boss at the top of every hour (Map 4), then back to Map 5",

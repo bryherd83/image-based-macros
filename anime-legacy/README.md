@@ -86,7 +86,7 @@ you may want to change:
 | `mode` | `dungeon` | `dungeon`, `culling`, `both` (Culling + dungeons), `defense` (dungeons, and Defense in between: opens Dragon City's key, Create, Play, then lets the game play it), `hueco` (Hueco Mundo, see below) or `alt` (join and stand still) |
 | `alt_dungeon_max_sec` | `900` | Alt mode: press Leave if a dungeon is still going after this long |
 | `hueco_leave_after` | `10` | Hueco Mundo: press Leave once this wave is cleared (F5 box) |
-| `hueco_leave_for_popups` | `true` | Hueco Mundo: join the Dungeon / Trial popups (that ends the run). `false` = finish the run first (F5 box) |
+| `hueco_leave_for_popups` | `true` | Hueco Mundo: also join Dungeon popups, and leave the run for Dungeon / Trial popups. `false` = no Dungeons at all, and Trials (if ticked) only between runs (F5 box) |
 | `hueco_not_before_popup_sec` | `300` | Hueco Mundo: don't start a run when a popup is due this soon |
 | `join_trials` | `true` | Join the Trial popup |
 | `trial_leave_after` | `27` | Leave the trial after this wave |
