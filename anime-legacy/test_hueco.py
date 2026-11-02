@@ -62,6 +62,27 @@ if os.path.isdir(SHOTS):
     f = cv2.imread(os.path.join(SHOTS, "s104.png"))
     if f is not None:
         assert T.find(f, "hmkey") is not None and T.find(f, "hmkey")[0] > 1100   # Soul Society's key
+    # your arrow hidden under the spawn diamond, the mouse pointer on the map near the rim (11-01
+    # 18:44-19:24, 12 runs lost): you're not found, and the pointer isn't taken for you
+    f = cv2.imread(os.path.join(SHOTS, "hidden.jpg"))
+    if f is not None:
+        assert hueco.read_map(f).player is None
+        # your arrow out by the rim (walking round a skull at 91 px: lost at 94+, Blayne 11-01)
+        c = hud.minimap_crop(f, hueco.MAP_R + hueco.ARROW_EXTRA)
+        R = (c.shape[0] - 1) // 2
+        hueco.find_arrow(c, R, 1.0)
+        for r in (70, 90, 94, 96, 98):      # (further out too little of it is on the map: stepping)
+            for deg in range(15, 360, 30):
+                if abs(math.cos(math.radians(deg))) > 0.97 or abs(math.sin(math.radians(deg))) > 0.97:
+                    continue                # (under the N/E/S/W badges)
+                x, y = R + round(r * math.cos(math.radians(deg))), R + round(r * math.sin(math.radians(deg)))
+                for k in (0, 30, 60, 90):
+                    o = c.copy()
+                    fill, band = hueco._ARROW_SHAPES[k]
+                    o[band[:, 1] + y, band[:, 0] + x] = (60, 50, 50)
+                    o[fill[:, 1] + y, fill[:, 0] + x] = (255, 255, 255)
+                    fa = hueco.find_arrow(o, R, 1.0)
+                    assert fa is not None and math.hypot(fa[0] - x, fa[1] - y) < 4, (r, deg, k, fa)
     print("readers: ok")
 else:
     print("readers: skipped (no testdata/hueco screenshots)")
@@ -72,8 +93,9 @@ class World:
     """Map px, north-up, spawn at (-1, -1). The arrow shows the camera; W walks where it looks."""
 
     def __init__(self, seed, rocks=True, speed=40.0, mount=2.0, mounted=False, waves_skulls=None, aura=2.5,
-                 drag_fail=0.0):
+                 drag_fail=0.0, hide_spawn=False, hide_beyond=None):
         self.aura = aura
+        self.hide_spawn, self.hide_beyond = hide_spawn, hide_beyond
         self.drag_fail, self.lost_drags = drag_fail, 0
         self.rng = random.Random(seed)
         self.t = 0.0
@@ -239,6 +261,9 @@ def patch():
 
     def read_map(f, prev=None):
         noise = lambda: f.rng.uniform(-0.4, 0.4)  # noqa: E731
+        if (f.hide_spawn and math.hypot(f.x + 1, f.y + 1) < 3) or \
+                (f.hide_beyond and math.hypot(f.x, f.y) > f.hide_beyond):
+            return hueco.HMap(player=None, arrow=None, skulls=[(s[0], s[1]) for s in f.skulls], spawn=(-1.0, -1.0))
         # next to a skull your arrow sometimes merges with its face and can't be told apart
         # (11-01 18:06): you're "not on the map" then
         if any(5 < math.hypot(s[0] - f.x, s[1] - f.y) < 12 for s in f.skulls) and f.rng.random() < 0.6:
@@ -280,6 +305,15 @@ for seed in (31, 32, 33):
     assert res == "left" and w.left_at in (10, 11), (seed, res, w.left_at, env.logs[-5:])
     print(f"drags failing half the time, seed {seed}: left at wave {w.left_at} · {w.t / 60:.1f} min · "
           f"{w.lost_drags} drags lost")
+# your arrow can't be seen, at spawn or out by the rim: it steps until it can (it stood still until
+# the run was lost, 11-01 18:42 and 18:44-19:27)
+for kw in ({"hide_spawn": True}, {"hide_beyond": 88}):
+    for seed in (41, 42):
+        w = World(seed, **kw)
+        env = Env(w)
+        res = hueco.HuecoRun(env).run()
+        assert res == "left" and w.left_at in (10, 11), (kw, seed, res, w.wave, env.logs[-5:])
+        print(f"arrow hidden {kw}, seed {seed}: left at wave {w.left_at} · {w.t / 60:.1f} min")
 for r in results:
     print("seed %d: %s at wave %s · %.1f min · Spawn %d · jumps %d · cards %s · M presses %d" % r)
 print("hueco run: ok")

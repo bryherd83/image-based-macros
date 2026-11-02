@@ -30,6 +30,8 @@ from dungeon import keys_for
 
 MAP_R = 102                     # read radius of the disc: out to its blue rim (a skull by the
                                 # S badge sat at 91 px and wasn't seen: the run froze, 11-01 18:12)
+ARROW_EXTRA = 10                # your arrow is read this much further out: it sticks out past MAP_R
+                                # when you walk round a skull by the rim (lost at 94+ px, Blayne 11-01)
 SPAWN_COST_SEC = 2.5            # what pressing Spawn costs, in seconds of walking
 CENTER_PX = 1.5                 # "in the middle of the skull": this close (map px)
 ARRIVE_PX = 4.0                 # at a skull when this close (map px at the default zoom)
@@ -161,7 +163,8 @@ def find_arrow(c, R, sy, prev=None):
     N = c.shape[0]
     mn, mx = c.min(axis=2), c.max(axis=2)
     yy, xx = np.mgrid[0:N, 0:N]
-    ins = (xx - R) ** 2 + (yy - R) ** 2 <= (R - 4) ** 2
+    # (only on the disc: past its rim is the game world, which can be white snow)
+    ins = (xx - R) ** 2 + (yy - R) ** 2 <= ((MAP_R + 2) * sy) ** 2
     white = ((mn > 235) & ins).astype(np.float32)
     dark = (mx < 160).astype(np.float32)        # the outline is black to mid grey
     n, _, st, _ = cv2.connectedComponentsWithStats(white.astype(np.uint8), connectivity=8)
@@ -277,9 +280,11 @@ def read_map(frame, prev=None) -> HMap | None:
             continue
         cands.append((float(cen[i][0]), float(cen[i][1])))
     player, arrow = None, None
-    fa = find_arrow(c, R, sy, prev)
+    c2 = hud.minimap_crop(frame, MAP_R + ARROW_EXTRA)
+    R2 = (c2.shape[0] - 1) // 2
+    fa = find_arrow(c2, R2, sy, prev)
     if fa is not None:
-        return HMap(player=((fa[0] - R) / sy, (fa[1] - R) / sy), arrow=fa[2], skulls=skulls, spawn=spawn)
+        return HMap(player=((fa[0] - R2) / sy, (fa[1] - R2) / sy), arrow=fa[2], skulls=skulls, spawn=spawn)
     best = None
     for (px, py) in cands:
         X, Y = round(mm.MAP_CX * sx - R + px), round(mm.MAP_CY * sy - R + py)
@@ -427,6 +432,8 @@ class HuecoRun:
         self.target = None
         self.lock = None                # the spot being cleared (see run)
         self.lost_since = None          # when your arrow went missing from the map
+        self.lost_steps = 0             # steps taken to find it again
+        self.lost_logged = False
         self.wave_t = env.now()
         self.unseen_logged = None
         self.last_arrow = None
@@ -681,15 +688,35 @@ class HuecoRun:
                 self.stop()
                 self.lost_since = self.lost_since or now
                 if lk is not None and lk["arrived"] is None and now - self.lost_since > 1.5 and \
-                        self.prev is not None and self.last_arrow is not None:
+                        self.prev is not None and self.last_arrow is not None and self.lost_steps < 5:
                     # lost next to the skull for a moment: a short step toward it (worked out from
-                    # where you were last seen and which way the camera looked then)
+                    # where you were last seen and which way the camera looked then). Only a few:
+                    # that spot goes stale, and past it these only walk you further off the map
                     self.lost_since = now
+                    self.lost_steps += 1
                     k = keys_for(lk["pos"][0] - self.prev[0], lk["pos"][1] - self.prev[1], self.last_arrow) or {"w"}
                     self.hold(k)
                     e.sleep(0.09)
                     self.stop()
                     e.log("Hueco Mundo: lost you on the map next to the spot · a short step toward it")
+                    continue
+                # still not seen: step until it shows. Waiting for it lost whole runs: the arrow
+                # can be hidden under the spawn diamond and only comes back when you move (11-01
+                # 18:44-19:24: 12 runs stood there, 0 kills, Defeat) or stay lost at a spot by the
+                # rim (18:42). Only with spots left (not in the countdown), and later when on a
+                # spot, where your arrow can sit on its skull while the group dies
+                at_spot = lk is not None and self.prev is not None and \
+                    math.hypot(self.prev[0] - lk["pos"][0], self.prev[1] - lk["pos"][1]) < 4
+                if spots_a and now - self.lost_since > (12 if at_spot else 3):
+                    self.lost_since = now
+                    self.hold({"wasd"[self.lost_steps % 4]})
+                    e.sleep(self.step_sec(12))
+                    self.stop()
+                    self.lost_steps += 1
+                    if not self.lost_logged:
+                        self.lost_logged = True
+                        e.log("Hueco Mundo: can't see you on the map · stepping until it shows · screenshot saved")
+                        e.shot("hueco-arrow-lost", force=True)
                     continue
                 if lk is not None and self.prev is not None and \
                         math.hypot(self.prev[0] - lk["pos"][0], self.prev[1] - lk["pos"][1]) < 4:
@@ -703,6 +730,7 @@ class HuecoRun:
                 continue
             px, py = m.player
             self.lost_since = None
+            self.lost_steps, self.lost_logged = 0, False
             if m.arrow is not None:
                 self.last_arrow = m.arrow
             moved = self.prev is not None and math.hypot(px - self.prev[0], py - self.prev[1]) > 12
