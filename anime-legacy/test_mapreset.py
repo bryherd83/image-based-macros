@@ -33,7 +33,7 @@ env.log = lambda m, *a, **k: lines.append((env.t, m))
 dg.DungeonRun(env).run()
 dg.Memory = Real
 resets = [t for t, m in lines if "starting the map over" in m]
-stuck = [t for t, m in lines if m.startswith("no unfinished rooms found")]
+stuck = [t for t, m in lines if m.startswith(("no unfinished rooms found", "no route to the"))]
 print(f"{env.t / 60:.1f} min, map restarts {len(resets)}, maps made {len(made)}, "
       f"restart {resets[0] - stuck[0]:.0f}s after the first 'no way'")
 assert resets and len(made) >= 2 and resets[0] - stuck[0] < 35

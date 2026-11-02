@@ -1053,8 +1053,15 @@ class DungeonRun:
                         e.sleep(1.5)
                         self.scan("pressed Spawn to look from there")
                         continue
-                todo, done = self.mem.counts()
-                self.say(f"no unfinished rooms found · waiting ({len(self.mem.rooms)} rooms known)")
+                # with rooms still to do this used to say "no unfinished rooms found" too (11-02
+                # 08:07:57: 11 to do, 9 s with no route): say what's in the way, to find out why
+                if todo_n:
+                    shut = sum(1 for t in self.mem.blocked.values() if t > now) // 2
+                    skip = sum(1 for t in self.mem.skip.values() if t > now)
+                    self.say(f"no route to the {todo_n} unfinished room(s) · waiting · in room {cell} · "
+                             f"{shut} door(s) blocked · {skip} room(s) skipped")
+                else:
+                    self.say(f"no unfinished rooms found · waiting ({len(self.mem.rooms)} rooms known)")
                 e.sleep(0.3)
                 continue
             x, y = self.pos()
