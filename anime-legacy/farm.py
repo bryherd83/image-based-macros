@@ -691,7 +691,6 @@ class App:
         self.S["join_trials"] = bool(self.trial_var.get())
         self.S["ride_mount"] = bool(self.mount_var.get())
         self.S["world_boss"] = bool(self.boss_var.get())
-        self.S["hueco_mount"] = self.S["ride_mount"]
         self.S["hueco_leave_for_popups"] = bool(self.hm_pop_var.get())
         try:
             self.S["hueco_leave_after"] = int(self.hm_leave_var.get())

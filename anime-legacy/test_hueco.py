@@ -184,7 +184,7 @@ class Env:
     def __init__(self, w, settings=None):
         self.w = w
         self.settings = {"hueco_leave_after": 10, "cam_px_per_rad": 584, "join_trials": True,
-                         "hueco_mount": True, **(settings or {})}
+                         **(settings or {})}
         self.tpl = None
         self.info = {}
         self.mount_on = None
@@ -329,18 +329,13 @@ for seed in range(1, 9):
     results.append((seed, res, w.left_at, round(w.t / 60, 1), w.spawns, w.jumps, w.cards_picked[:2], env.presses))
     assert res == "left" and w.left_at in (10, 11), (seed, res, w.left_at, env.logs[-5:])
     assert w.cards_picked and set(w.cards_picked) == {2}, (seed, w.cards_picked)
-    assert w.mounted, seed                                         # got on the mount
-# already on the mount (and known): not pressed
+    assert env.presses == 0 and not w.mounted, seed                # never touches the mount
+# on the mount (you get on before the run): it stays on (M got you off it, 11-02 13:19:12)
 w = World(9, mounted=True)
 env = Env(w)
-env.mount_on = True
 run = hueco.HuecoRun(env)
 assert run.run() == "left" and env.presses == 0 and w.mounted
 assert run.speed < 110, run.speed             # (80 here. A walk counted as a tap: 119 in game, 11-02 13:01)
-# on the mount but not known: the probe presses M, sees it got slower, presses again
-w = World(10, mounted=True)
-env = Env(w)
-assert hueco.HuecoRun(env).run() == "left" and env.presses == 2 and w.mounted
 # the camera drag often doesn't take (right button missed): still gets through every wave
 for seed in (31, 32, 33):
     w = World(seed, drag_fail=0.5)
@@ -350,11 +345,6 @@ for seed in (31, 32, 33):
     print(f"drags failing half the time, seed {seed}: left at wave {w.left_at} · {w.t / 60:.1f} min · "
           f"{w.lost_drags} drags lost")
 assert "Hueco time: " in " ".join(env.logs), env.logs[-3:]
-# the last mode said "on the mount" but it isn't (11-02 12:02:24): noticed once, and it gets on
-w = World(11, mounted=False)
-env = Env(w, {"hueco_speed_px_s": 80.0})
-env.mount_on = True
-assert hueco.HuecoRun(env).run() == "left" and w.mounted and env.presses == 1, env.presses
 # shuffling a little after each jump still counts toward pressing Spawn (11-02 12:16:30: 52 s)
 w = World(12)
 run = hueco.HuecoRun(Env(w))

@@ -493,13 +493,7 @@ class HuecoRun:
         self.unstick_keys = set()
         self.keys = set()
         self.last_status = ""
-        self.sample = None              # (t, x, y) start of a W-only stretch (speed / mount check)
-        self.mount_want = bool(S.get("hueco_mount", True)) and hasattr(env, "toggle_mount")
-        self.mount_step = None          # None, ('pressed', speed_before)
-        self.mount_speeds = []
-        self.mount_done = getattr(env, "mount_on", None) is True
-        self.slow_walks = 0             # stretches in a row well below mount speed
-        self.mount_rechecked = False
+        self.sample = None              # (t, x, y) start of a W-only stretch (speed)
         self.doing = "other"            # what the time since the last loop went on
         self.spent: dict = {}
         self.tick_t = env.now()
@@ -539,37 +533,6 @@ class HuecoRun:
         e.sleep(3)
         f = e.frame()
         return f is None or hud.castle_x(f) is None
-
-    # ---- mount: like the dungeon's, judged by the speed on the map ----
-    def mount_check(self, now, speed):
-        """Gets on the mount: three speed readings, press M, three more. Faster = it got on; slower =
-        it was on already and that press got off (press again). The fastest of each three counts
-        (a rock or a turn only ever makes a reading slower)."""
-        e = self.env
-        if not self.mount_want or self.mount_done:
-            return
-        self.mount_speeds.append(speed)
-        if len(self.mount_speeds) < 3:
-            return
-        sp, self.mount_speeds = max(self.mount_speeds), []
-        if self.mount_step is None:
-            if e.toggle_mount("Hueco Mundo · getting on the mount"):
-                self.mount_step = ("pressed", sp)
-            else:
-                self.mount_done = True
-            return
-        before = self.mount_step[1]
-        self.mount_done = True
-        if sp < 0.8 * before:
-            e.toggle_mount("slower after that press, so it was already on the mount · pressing again")
-        elif sp < 1.3 * before:
-            e.log("Hueco Mundo: the mount key didn't change the speed · leaving it as it is")
-            self.walk_speed = sp
-            return
-        e.mount_on = True
-        mx = max(sp, before)
-        e.save_setting("hueco_speed_px_s", round(mx, 1), quiet=True)
-        self.speed = self.walk_speed = mx
 
     def step_sec(self, px):
         """How long to hold a key to move about `px` map pixels."""
@@ -1014,7 +977,7 @@ class HuecoRun:
         # you and "not getting closer" all run, 11-02 13:01:19)
         self.last_tap = None
         self.hold({"w"})
-        # speed (W only, going straight): the mount check and the Spawn shortcut use it. Only a
+        # speed (W only, going straight): the Spawn shortcut uses it. Only a
         # stretch walked without a break (a fight or a turn in between made it look slow)
         if now - self.last_walk > 0.4:
             self.sample = None
@@ -1028,22 +991,11 @@ class HuecoRun:
             self.sample = None
             # a clean stretch: no rock hit, and going the way the camera looks (not scraping along)
             if sp > 3 and st0 == self.stucks and abs(wrap(math.atan2(dy, dx) - m.arrow)) < 0.4:
-                if self.mount_want and not self.mount_done:
-                    self.mount_check(now, sp)
-                elif sp > 0.6 * (self.walk_speed or sp):
-                    self.slow_walks = 0
+                # (the mount is yours to get on before the run: the macro's M presses, judged by
+                # speed, got you off it, 11-02 13:19:12)
+                if sp > 0.6 * (self.walk_speed or sp):
                     self.speed = sp if not self.speed else 0.8 * self.speed + 0.2 * sp
                     self.walk_speed = sp if not self.walk_speed else 0.8 * self.walk_speed + 0.2 * sp
                     e.save_setting("hueco_speed_px_s", round(self.walk_speed, 1), quiet=True)
-                elif self.mount_want and not self.mount_rechecked and sp > 0.2 * self.walk_speed:
-                    # the mount can be gone though the last mode left it on: the dungeon after a
-                    # run found it off (11-02 12:02:24), and Hueco never checked. Once a run. (On foot
-                    # reads 26-50% of mount speed: slower than that is a rock, not the mount)
-                    self.slow_walks += 1
-                    if self.slow_walks >= 3:
-                        self.mount_rechecked, self.mount_done, self.mount_step = True, False, None
-                        self.mount_speeds = []
-                        e.mount_on = None
-                        e.log(f"Hueco Mundo: walking at {100 * sp / self.walk_speed:.0f}% of mount speed · checking the mount")
         self.stuck_check(now, px, py)
         e.sleep(0.03)
