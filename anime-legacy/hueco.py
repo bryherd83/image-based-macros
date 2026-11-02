@@ -650,14 +650,20 @@ class HuecoRun:
                 else:
                     lk["gone"] = 0
                 done = None
-                if lk["arrived"] is not None and spots_a is not None and lk["spots"] is not None \
-                        and spots_a < lk["spots"]:
+                if lk["spots"] is None:
+                    lk["spots"] = spots_a
+                # also on the way there: the group can die before you're in the middle, and it kept
+                # tapping until the skull changed (user's idea, 11-02). If it was another spot
+                # that went, the nearest skull just gets picked again
+                if spots_a is not None and lk["spots"] is not None and spots_a < lk["spots"]:
                     done = f"SPOTS went down to {spots.text}"
                 elif lk["gone"] >= 4:
                     done = "its skull turned into a check"
                 if done:
                     if lk["arrived"] is not None:
                         e.log(f"Hueco Mundo: spot cleared ({done}) after {now - lk['arrived']:.0f}s")
+                    elif done.startswith("SPOTS"):
+                        e.log(f"Hueco Mundo: spot cleared ({done}) on the way there")
                     self.lock = lk = None
                     self.at_target_since, self.sweep_i = None, 0
             if m is None or m.player is None:
@@ -704,7 +710,7 @@ class HuecoRun:
                         math.hypot(self.prev[0] - lk["pos"][0], self.prev[1] - lk["pos"][1]) < 4:
                     # (on the skull your arrow can merge with its white face: you're there)
                     if lk["arrived"] is None:
-                        lk["arrived"], lk["spots"] = now, spots_a
+                        lk["arrived"] = now
                     self.say(f"fighting · wave {self.wave} · enemies {self.en_text} · spots {spots.text if spots else '?'}")
                 else:
                     self.say("can't see you on the map · waiting")
@@ -744,7 +750,7 @@ class HuecoRun:
                     e.sleep(0.2)
                     continue
                 best = min(skulls, key=lambda sk: dist(sk, (px, py)))
-                self.lock = lk = {"pos": best, "wave": self.wave, "arrived": None, "spots": None,
+                self.lock = lk = {"pos": best, "wave": self.wave, "arrived": None, "spots": spots_a,
                                   "gone": 0, "t": now}
                 self.at_target_since, self.sweep_i = None, 0
                 self.stuck_tries = 0
@@ -775,7 +781,7 @@ class HuecoRun:
             # (out there the map may end short of the skull: as near as it gets after 20 s will do)
             if lk["arrived"] is None and (d <= (RIM_CENTER_PX if on_rim else CENTER_PX)
                                           or (on_rim and d < 12 and now - lk["t"] > 20)):
-                lk["arrived"], lk["spots"] = now, spots_a
+                lk["arrived"] = now
                 self.at_target_since = now
                 self.stucks, self.tap_ref = 0, None
             if lk["arrived"] is None:
@@ -784,8 +790,6 @@ class HuecoRun:
                 continue
             # ---- at the spot: stay until SPOTS goes down (see above)
             self.doing = "fighting"
-            if lk["spots"] is None:
-                lk["spots"] = spots_a
             here = now - lk["arrived"]
             quiet = now - max(self.last_kill_t, lk["arrived"])
             if here > 120:

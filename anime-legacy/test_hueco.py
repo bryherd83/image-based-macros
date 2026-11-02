@@ -331,6 +331,11 @@ for seed in range(1, 9):
     assert res == "left" and w.left_at in (10, 11), (seed, res, w.left_at, env.logs[-5:])
     assert w.cards_picked and set(w.cards_picked) == {2}, (seed, w.cards_picked)
     assert env.presses == 0 and not w.mounted, seed                # never touches the mount
+# SPOTS goes down while still walking in (the group dies from further out): it moves on at once
+w = World(13, aura=12.0)
+env = Env(w)
+assert hueco.HuecoRun(env).run() == "left"
+assert any("on the way there" in m for m in env.logs), env.logs[-5:]
 # on the mount (you get on before the run): it stays on (M got you off it, 11-02 13:19:12)
 w = World(9, mounted=True)
 env = Env(w)
