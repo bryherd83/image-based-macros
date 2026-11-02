@@ -268,7 +268,7 @@ def patch():
     """The screen readers answer from the simulated world (frame = the World)."""
     hueco.card_screen = lambda f, tpl: f.card_until is not None
     hueco.is_hueco = lambda f, castle=None: f.card_until is None and f.t >= f.transition_until
-    hud.castle_x = lambda f: 828 if (f.card_until is None and f.t >= f.transition_until) else None
+    hud.castle_x = lambda f: 828 if (f.card_until is None and f.t >= f.transition_until and f.left_at is None) else None
     hud.covered = lambda f: f.t < f.transition_until
     hud.spawn_hidden = lambda f, xy=None: False
     hud.find_popup = lambda f: None
@@ -305,6 +305,20 @@ assert not hueco.in_run(f, c, None)
 f = cv2.imread(os.path.join(HERE, "testdata", "hueco", "run-ended-lobby.jpg"))
 assert not hueco.in_run(f, hud.castle_x(f), 8)
 print("still in the run: ok")
+# Leave matches its picture only 89% on Blayne's PC: it stayed on wave 11 (11-02 13:08). No such
+# button in the lobby
+tpl = hud.Templates()
+c = tpl.find(cv2.imread(os.path.join(HERE, "testdata", "hueco", "leave-89pct.jpg")), "leave", min_frac=0.8)
+assert c and abs(c[0] - 909) < 4 and abs(c[1] - 115) < 4, c
+assert tpl.find(f, "leave", min_frac=0.8) is None
+# no match at all: its usual spot, and with the panel still there after the click it tries again
+import types  # noqa: E402
+f = cv2.imread(os.path.join(HERE, "testdata", "hueco", "leave-89pct.jpg"))
+clicks = []
+env = types.SimpleNamespace(find=lambda *a, **k: None, click=lambda x, y: clicks.append((x, y)), log=print,
+                            shot=lambda *a, **k: None, sleep=lambda s: None, frame=lambda: f)
+stub = types.SimpleNamespace(env=env, stop=lambda: None, wave=11)
+assert hueco.HuecoRun.leave(stub, "test", f, 828) is False and clicks == [(909, 115)], clicks
 
 patch()
 results = []
@@ -320,13 +334,22 @@ for seed in range(1, 9):
 w = World(9, mounted=True)
 env = Env(w)
 env.mount_on = True
-assert hueco.HuecoRun(env).run() == "left" and env.presses == 0 and w.mounted
+run = hueco.HuecoRun(env)
+assert run.run() == "left" and env.presses == 0 and w.mounted
+assert run.speed < 110, run.speed             # (80 here. A walk counted as a tap: 119 in game, 11-02 13:01)
 # on the mount but not known: the probe presses M, sees it got slower, presses again
 w = World(10, mounted=True)
 env = Env(w)
 assert hueco.HuecoRun(env).run() == "left" and env.presses == 2 and w.mounted
-# walks with W/A/S/D as the camera looks: no camera drags at all
-assert w.lost_drags == 0 and "Hueco time: " in " ".join(env.logs), env.logs[-3:]
+# the camera drag often doesn't take (right button missed): still gets through every wave
+for seed in (31, 32, 33):
+    w = World(seed, drag_fail=0.5)
+    env = Env(w)
+    res = hueco.HuecoRun(env).run()
+    assert res == "left" and w.left_at in (10, 11), (seed, res, w.left_at, env.logs[-5:])
+    print(f"drags failing half the time, seed {seed}: left at wave {w.left_at} · {w.t / 60:.1f} min · "
+          f"{w.lost_drags} drags lost")
+assert "Hueco time: " in " ".join(env.logs), env.logs[-3:]
 # the last mode said "on the mount" but it isn't (11-02 12:02:24): noticed once, and it gets on
 w = World(11, mounted=False)
 env = Env(w, {"hueco_speed_px_s": 80.0})
@@ -335,11 +358,12 @@ assert hueco.HuecoRun(env).run() == "left" and w.mounted and env.presses == 1, e
 # shuffling a little after each jump still counts toward pressing Spawn (11-02 12:16:30: 52 s)
 w = World(12)
 run = hueco.HuecoRun(Env(w))
+run.hold({"w"})
 for i in range(8):
     run.progress = (w.t - 1.0, 0.0, 0.0)
     run.stuck_check(w.t, 0.0, 0.0)
     run.stuck_check(w.t, 5.0, 0.0)              # (moved: the old count started again here)
-assert w.spawns == 1, w.spawns
+assert w.spawns == 1 and run.keys == set(), (w.spawns, run.keys)   # (W gets pressed again after it)
 # your arrow can't be seen, at spawn or out by the rim: it steps until it can (it stood still until
 # the run was lost, 11-01 18:42 and 18:44-19:27)
 for kw in ({"hide_spawn": True}, {"hide_beyond": 88}):
