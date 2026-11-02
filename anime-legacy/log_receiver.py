@@ -248,11 +248,12 @@ async function tick(){
    else if(s.run==="dungeon"){state="Dungeon";cls="ok"}
    else if(s.run==="trial"){state="Trial · wave "+esc(s.wave);cls="ok"}
    else if(s.run==="defense"){state="Defense · wave "+esc(s.wave)+" (the game plays it)";cls="ok"}
+   else if(s.run==="hueco"){state="Hueco Mundo · wave "+esc(s.wave);cls="ok"}
    else{state="Waiting for the next dungeon / trial";cls="ok"}
    h+='<div class="card"><h2>'+esc(f.pc)+'</h2><div class="big '+cls+'">'+state+'</div>';
    if(f.age!=null&&f.age<=60){
     h+='<div>'+esc(s.doing)+'</div><div class="row dim"><span>enemies '+esc(s.enemies)+'</span>';
-    if(s.run==="dungeon") h+='<span>rooms '+esc(s.rooms)+'</span>';
+    if(s.run==="dungeon"||s.run==="hueco") h+='<span>'+(s.run==="hueco"?'':'rooms ')+esc(s.rooms)+'</span>';
     h+='<span>updated '+f.age+' s ago</span></div>';
    }
    if(f.pic_age!=null&&f.pic_age<300) h+='<img src="/live.jpg?from='+encodeURIComponent(f.pc)+'&t='+Date.now()+'"><div class="dim">screen '+f.pic_age+' s ago</div>';

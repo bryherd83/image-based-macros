@@ -303,6 +303,11 @@ class Heading:
             self.nominal = speed
         elif speed > 0.7 * self.nominal:
             self.nominal = 0.85 * self.nominal + 0.15 * speed
+        elif self.psi is not None and abs(wrap(raw - self.psi)) < 0.2:
+            # slower, but going exactly where the keys say (so not sliding along a wall): e.g.
+            # off the mount after riding. Before, the speed could only ever go up, so after a
+            # ride every walk looked like 'sliding' and taught nothing
+            self.nominal = 0.9 * self.nominal + 0.1 * speed
         if speed < 0.65 * self.nominal:
             return None                           # sliding along a wall: says nothing
         if speed > 3.0 * self.nominal:
@@ -1295,12 +1300,17 @@ class DungeonRun:
                 e.toggle_mount("slower after that press, so it was already on the mount · pressing again")
                 self.sprint_pause = now + 120
                 e.mount_on = True
+                # the "mount speed" it compared with was too high (riding read as ~50% of it every
+                # dungeon, 11-01): what was just measured on the mount becomes ~75% of it
+                if before > 0.05 and self.sprint_ref > before / 0.75:
+                    self.sprint_ref = before / 0.75
+                    e.log(f"mount speed corrected to {self.sprint_ref:.2f} rooms/s")
             else:
                 if med >= 0.78 * self.sprint_ref or med > 1.15 * before:
                     e.mount_on = True
                 if med > 1.15 * before:
                     e.log(f"on the mount · {med / max(before, 1e-6):.1f}x as fast as before")
-                    self.sprint_ref = max(ref, med)
+                    self.sprint_ref = med
                 if med >= 0.78 * self.sprint_ref:
                     self.sprint_taps.clear()
             return
@@ -1310,7 +1320,8 @@ class DungeonRun:
         if not self.mount_probe and med >= float(self.S.get("mount_off_below", 0.5)) * ref:
             e.mount_on = True
             if med >= 0.92 * ref:                # on the mount: keep its speed up to date
-                self.sprint_ref = med if med > 1.25 * ref else 0.9 * ref + 0.1 * med
+                # (step by step: one fast misread used to set it outright and stayed for good)
+                self.sprint_ref = min(med, 1.25 * ref) if med > 1.25 * ref else 0.9 * ref + 0.1 * med
             return
         self.sprint_taps = [t for t in self.sprint_taps if now - t < 120]
         if len(self.sprint_taps) >= 3:
@@ -1364,7 +1375,7 @@ class DungeonRun:
             # used - it slowly follows whatever speed you walk at, sprint on or off). Only from
             # clearly-sprinting stretches, so it can't drift down to plain walking speed.
             if med >= 0.92 * ref:
-                self.sprint_ref = med if med > 1.25 * ref else 0.9 * ref + 0.1 * med
+                self.sprint_ref = min(med, 1.25 * ref) if med > 1.25 * ref else 0.9 * ref + 0.1 * med
             e.sprint_on = True
             return
         self.sprint_taps = [t for t in self.sprint_taps if now - t < 120]

@@ -65,10 +65,14 @@ def find_roblox():
             user32.GetClientRect(hwnd, ctypes.byref(r))
             if r.right - r.left >= 100 and r.bottom - r.top >= 100:
                 found.append(hwnd)
-                return False
         return True
 
     user32.EnumWindows(PROC(cb), 0)
+    # several Roblox windows (alt accounts): the one in front, so 'is Roblox active?' doesn't stay
+    # 'no' forever because a different Roblox window happened to be listed first
+    fg = user32.GetForegroundWindow()
+    if fg in found:
+        return fg
     return found[0] if found else None
 
 

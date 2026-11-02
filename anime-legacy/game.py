@@ -20,7 +20,7 @@ SETTINGS_FILE = os.path.join(HERE, "settings.json")
 AHK_INI = os.path.expandvars(r"%USERPROFILE%\Downloads\anime-legacy-settings.ini")
 
 DEFAULTS = {
-    "mode": "dungeon",                 # culling | dungeon | both
+    "mode": "dungeon",                 # culling | dungeon | both | defense | hueco
     "join_trials": True,
     "trial_leave_after": 27,
     "leave_at_wave": 9,                # Culling Game: leave when the wave counter reaches this (0 = never)
@@ -80,6 +80,12 @@ DEFAULTS = {
     "trial_empty_room_sec": 5, "trial_room_walk_sec": 3.0,
     # logging
     "log_enabled": True, "log_shot_minutes": 5, "log_keep_hours": 24,
+    # Hueco Mundo (mode "hueco", hueco.py)
+    "hueco_leave_after": 10,           # press Leave once this wave is cleared
+    "hueco_leave_for_popups": True,    # join Dungeon / Trial popups (leaves the run); False = finish first
+    "hueco_not_before_popup_sec": 300,  # (with that on) don't start a run this close to a popup
+    "hueco_mount": True,               # ride the mount (M) there
+    "hueco_spawn_shortcut": True,      # press Spawn when walking from spawn is quicker
 }
 
 

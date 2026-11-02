@@ -11,6 +11,7 @@ executor and no script injection.
 | **Dungeons** | Joins the Dungeon popup (every half hour at :01:40 and :31:40). Reads the minimap to know which rooms are cleared, turns the camera to face each door, walks room to room, waits for the enemies to die, and keeps going until every room is cleared. About 8–9 minutes for 50 rooms. |
 | **Trials** | Joins the Trial popup (at :16:40 and :46:40). Presses Spawn, walks straight into each room until the DPS meter shows it's hitting, and moves on when the wave is cleared. Leaves after a chosen wave. About 3.5 minutes to wave 24. |
 | **Culling Game** | Waits in the lobby, joins, and leaves at a chosen wave. |
+| **Hueco Mundo** | Opens it from Soul Society's purple key (Teleport menu → Create → Play) and closes the windows left open. Each wave it walks to the red skulls on the minimap one by one (nearest first, riding the mount) and stays until each group is dead. Presses Spawn when walking from spawn is quicker, and jumps over rocks. Votes in the card picks (cards in `assets/hmcard_1_*.png`, then `hmcard_2_*.png`, else a red Risk & Reward card). Leaves after wave 10. |
 
 **Dungeon + Trial together:** a dungeon that's still clearing rooms is finished first. If it's
 stuck (no new room for 2 minutes) when the Trial pops up, it leaves for the Trial.
@@ -81,7 +82,11 @@ you may want to change:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `mode` | `dungeon` | `dungeon`, `culling`, `both` (Culling + dungeons) or `defense` (dungeons, and Defense in between: opens Dragon City's key, Create, Play, then lets the game play it) |
+| `mode` | `dungeon` | `dungeon`, `culling`, `both` (Culling + dungeons), `defense` (dungeons, and Defense in between: opens Dragon City's key, Create, Play, then lets the game play it) or `hueco` (Hueco Mundo, see below) |
+| `hueco_leave_after` | `10` | Hueco Mundo: press Leave once this wave is cleared (F5 box) |
+| `hueco_leave_for_popups` | `true` | Hueco Mundo: join the Dungeon / Trial popups (that ends the run). `false` = finish the run first (F5 box) |
+| `hueco_not_before_popup_sec` | `300` | Hueco Mundo (with the above on): don't start a run when a popup is due this soon |
+| `hueco_mount` | `true` | Ride the mount in Hueco Mundo (follows the F5 mount box) |
 | `join_trials` | `true` | Join the Trial popup |
 | `trial_leave_after` | `27` | Leave the trial after this wave |
 | `defense_not_before_popup_sec` | `300` | Defense mode: don't start a Defense when a dungeon or trial pops up within this many seconds |
@@ -106,6 +111,7 @@ you may want to change:
 | `hud.py` / `minimap.py` | Reading the counters, DPS meter, popups and the minimap |
 | `dungeon.py` | Dungeon navigation |
 | `trial.py` | Trial rooms |
+| `hueco.py` | Hueco Mundo: its map (skulls, you, spawn), WAVE / SPOTS counters, card vote, the run |
 | `culling.py` | Culling Game and the popup schedule |
 | `reconnect.py` | Disconnect detection and rejoin |
 | `logsend.py` / `log_receiver.py` | Sending the log to another PC on your home network |
@@ -116,6 +122,7 @@ you may want to change:
 ```bat
 .venv\Scripts\python.exe sweep.py            :: 96 simulated dungeons
 .venv\Scripts\python.exe test_trial.py       :: trial simulator
+.venv\Scripts\python.exe test_hueco.py       :: Hueco Mundo: screen readers + simulated runs
 .venv\Scripts\python.exe test_sprint.py
 .venv\Scripts\python.exe test_reconnect.py
 .venv\Scripts\python.exe test_capture.py
@@ -134,3 +141,11 @@ aren't uploaded.
   holding the right mouse button.
 - **Close the AutoHotkey version first.** Both use the same F-keys.
 - Anything else: check `log-py.txt` in `Pictures\Screenshots\anime-legacy-log\`.
+
+## Hueco Mundo: adding card pictures
+
+The card vote picks, in this order: a card whose title plate matches `assets/hmcard_1_*.png`,
+then `assets/hmcard_2_*.png` (one is there: "Espada Challenge", +1 drop roll), then any red
+Risk & Reward card, then card 1. To have the "50%+ more mobs" card picked first, take a
+fullscreen screenshot (Print Screen) of a vote showing it and cut out its title plate (the
+gold or red bar with the card's name, about 260x32 px) as `assets/hmcard_1_mobs.png`.

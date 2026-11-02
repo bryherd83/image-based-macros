@@ -162,10 +162,12 @@ class Culling:
         self.nav_clicks = {}
         self.hold_until = self.env.now() + float(self.env.settings.get("after_join_hold_sec", 25))
 
-    def defense_tick(self, f):
+    def defense_tick(self, f, icon="key", what="Defense", where="Dragon City's key", prefix="defense",
+                     not_before=None):
         """Mode 'defense', not in a run: open Defense (Worlds menu -> Dragon City's key ->
         Create -> Play) unless a Dungeon / Trial popup is due soon. Dungeons and trials are
-        joined from their popups by farm.tick, also from inside Defense."""
+        joined from their popups by farm.tick, also from inside Defense.
+        Also Hueco Mundo (hueco_tick): the same menus from Soul Society's purple key."""
         e = self.env
         S = e.settings
         now = e.now()
@@ -183,7 +185,7 @@ class Culling:
         if navigating and popup and popup() is not None:
             return                                # a popup is up: it gets joined, not Defense
         if not just_started and navigating:
-            for name, msg in (("play", "pressed Play"), ("create", "pressed Create"), ("key", "opened Defense")):
+            for name, msg in (("play", "pressed Play"), ("create", "pressed Create"), (icon, f"opened {what}")):
                 c = e.find(name, f)
                 if c:
                     n = self.nav_clicks.get(name, 0) + 1
@@ -198,10 +200,10 @@ class Culling:
                     if name == "play":
                         self.last_start, self.last_nav = now, 0
                         self.def_fails = 0
-                        e.log("Defense: started · the game plays it until the next dungeon / trial popup")
+                        e.log(f"{what}: started" + (" · the game plays it until the next dungeon / trial popup" if prefix == "defense" else ""))
                     else:
                         self.last_nav = now
-                    e.status(f"Defense: {msg}")
+                    e.status(f"{what}: {msg}")
                     return
         if just_started:
             # the "Dragon Defense" window, and the Teleport (Worlds) menu behind it, stay open after
@@ -212,12 +214,14 @@ class Culling:
             if now - self.last_start > float(S.get("defense_play_wait_sec", 3)) and c:
                 if now - getattr(self, "_def_close_logged", -1e9) > 600:
                     self._def_close_logged = now
-                    e.log("Defense: closing the windows left open after Play")
+                    e.log(f"{what}: closing the windows left open after Play")
                 e.close_menu(*c)
                 return
-            e.status("Defense: starting...")
+            e.status(f"{what}: starting...")
             return
-        if due_in < float(S.get("defense_not_before_popup_sec", 300)):
+        if not_before is None:
+            not_before = float(S.get(f"{prefix}_not_before_popup_sec", 300))
+        if due_in < not_before:
             self.waiting_room(f)                  # a popup comes in a moment: just wait for it
             return
         c = e.find("close", f)
@@ -231,15 +235,24 @@ class Culling:
         fails = getattr(self, "def_fails", 0)
         wait = 8 if fails < 4 else 120            # keeps failing: try again every 2 minutes
         if now - self.last_open_try < wait:
-            e.status(f"Defense: next try in {wait - (now - self.last_open_try):.0f}s · next {kind} popup at {t:%H:%M:%S}")
+            e.status(f"{what}: next try in {wait - (now - self.last_open_try):.0f}s · next {kind} popup at {t:%H:%M:%S}")
             return
         self.last_open_try = now
         self.def_fails = fails + 1
         self.nav_clicks = {}
         if self.def_fails == 4:
-            e.log("Defense: couldn't open it 4 times in a row · trying every 2 minutes · screenshot saved")
-            e.shot("defense-wont-open", force=True)
-        self.open_card(f, "key", "Defense", "Dragon City's key")
+            e.log(f"{what}: couldn't open it 4 times in a row · trying every 2 minutes · screenshot saved")
+            e.shot(f"{prefix}-wont-open", force=True)
+        self.open_card(f, icon, what, where)
+
+    def hueco_tick(self, f):
+        """Mode 'hueco', not in a run: open Hueco Mundo (Teleport menu -> Soul Society's purple key
+        -> Create -> Play). With hueco_leave_for_popups on, not when a Dungeon / Trial popup is
+        due within hueco_not_before_popup_sec (the run would be cut short)."""
+        S = self.env.settings
+        nb = float(S.get("hueco_not_before_popup_sec", 300)) if S.get("hueco_leave_for_popups", True) else 0.0
+        return self.defense_tick(f, icon="hmkey", what="Hueco Mundo", where="Soul Society's purple key",
+                                 prefix="hueco", not_before=nb)
 
     def open_culling(self, f):
         self.open_card(f, "dice", "Culling Game", "Cursed Academy's dice")

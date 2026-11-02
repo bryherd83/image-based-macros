@@ -196,7 +196,9 @@ def sprint_off_for_trial(env, S):
     on = getattr(env, "sprint_on", None)
     toggle = getattr(env, "toggle_sprint", None)
     if on is None:
-        env.log("trial: no dungeon yet to tell if sprint is on · leaving it as it is")
+        if not getattr(env, "_sprint_unknown_logged", False):
+            env._sprint_unknown_logged = True
+            env.log("trial: sprint state unknown (dungeons ride the mount instead) · leaving it as it is")
         return
     if not on or not toggle:
         return

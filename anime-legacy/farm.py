@@ -21,11 +21,13 @@ import tkinter as tk
 from tkinter import ttk
 
 import hud
+import hueco
 import logsend
 import minimap as mm
 import winio
 from culling import DEFAULT_OFFSET, Culling, next_popup, popup_offset
 from dungeon import DungeonRun
+from hueco import HuecoRun
 from game import Game, load_settings, save_settings
 from reconnect import Watchdog
 from trial import run_trial
@@ -112,6 +114,13 @@ class Farm:
     def start(self):
         if self.running:
             return
+        if self.thread is not None and self.thread.is_alive():
+            # F6 off and straight on again: the last run is still finishing a step (e.g. scrolling
+            # the Worlds menu); starting now would have two of them pressing keys at once
+            self.thread.join(timeout=3)
+            if self.thread.is_alive():
+                self.app.toast("Still stopping the last run · press F6 again in a moment")
+                return
         if not winio.find_roblox():
             self.app.toast("Can't find Roblox. Open the game first.")
             return
@@ -120,6 +129,7 @@ class Farm:
         self.last_game_seen = time.monotonic()
         S = self.S
         self.game.log(f"=== started · farming {S['mode']}"
+                      f"{' (leave after wave %d)' % int(S.get('hueco_leave_after', 10)) if S['mode'] == 'hueco' else ''}"
                       f"{' + trials (leave after wave %d)' % S['trial_leave_after'] if S['join_trials'] else ''} ===")
         self.thread = threading.Thread(target=self.loop, daemon=True)
         self.thread.start()
@@ -234,8 +244,12 @@ class Farm:
             return
         mode = S["mode"]
         # ---- Dungeon / Trial popup: press its green check
-        if mode != "culling" or S["join_trials"]:
+        # in a Hueco Mundo run that isn't to be left for popups: leave them alone
+        in_hueco = mode == "hueco" and g.find("roomhud", f) is not None and hueco.is_hueco(f)
+        if (mode != "culling" or S["join_trials"]) and not (in_hueco and not S.get("hueco_leave_for_popups", True)):
             pop = hud.find_popup(f)
+            if pop and time.monotonic() - getattr(self, "_join_t", -1e9) < 4:
+                pop = None          # just clicked one: it's closing (clicked twice before, 11-01)
             if pop and pop.kind == "trial" and g.find("roomhud", f) and hud.has_minimap(f):
                 pop = None          # still in a dungeon: run_dungeon decides (finish it unless stuck)
             if pop and ((pop.kind == "dungeon" and mode != "culling") or (pop.kind == "trial" and S["join_trials"])):
@@ -245,6 +259,7 @@ class Farm:
                 g.log(f"joining the {pop.kind}")
                 g.shot(f"joining-{pop.kind}", force=True)
                 self.last_join = dt.datetime.now()
+                self._join_t = time.monotonic()
                 # stop setting up Defense: its Play button was still on screen and got pressed
                 # while the dungeon loaded, which took you to Defense instead (PC 10-19 15:31)
                 culling.joined_popup()
@@ -260,6 +275,16 @@ class Farm:
                 time.sleep(1.0)
                 return
         self.popup_watch(g, mode)
+        # ---- in Hueco Mundo? (its own HUD: a SPOTS counter and a light map; must come before the
+        # dungeon / trial check below, which would take it for a trial)
+        if in_hueco or (mode == "hueco" and hueco.card_screen(f, g.tpl)):
+            self.run_hueco(g, culling)
+            return
+        if mode != "hueco" and g.find("roomhud", f) and hueco.is_hueco(f):
+            g.release_all()
+            g.status("in Hueco Mundo · not farming it (pick Hueco Mundo in F5)")
+            time.sleep(0.5)
+            return
         # ---- in a dungeon or a trial?
         if (mode != "culling" or S["join_trials"]) and g.find("roomhud", f):
             if g.find("defheart", f) and not hud.has_minimap(f):
@@ -325,7 +350,25 @@ class Farm:
         if mode == "defense":
             culling.defense_tick(f)
             return
+        if mode == "hueco":
+            culling.hueco_tick(f)
+            return
         culling.tick(f)
+
+    def run_hueco(self, g: Game, culling: Culling):
+        g.info["run"] = "hueco"
+        t0 = time.monotonic()
+        res = HuecoRun(g).run()
+        self.last_game_seen = time.monotonic()
+        g.info["run"] = "-"
+        culling.last_in_run, culling.last_start, culling.last_nav = time.monotonic(), 0, 0
+        if res == "popup":                  # it clicked a Dungeon / Trial popup
+            self.last_join = dt.datetime.now()
+            culling.joined_popup()
+        if res not in ("stopped", "paused"):
+            g.log(f"Hueco Mundo run ended ({res}) after {(time.monotonic() - t0) / 60:.1f} min")
+        g.status("Hueco Mundo: " + {"left": "left after the set wave", "popup": "left for a popup",
+                                      "paused": "paused · click on the Roblox window to go on"}.get(res, res))
 
     def run_dungeon(self, g: Game):
         resume = None
@@ -403,6 +446,13 @@ class Farm:
             en, wv = hud.read_counter(f, "enemies"), hud.read_counter(f, "wave")
             lines.append(f"enemies: {en.text if en else '?'}   wave/room: {wv.text if wv else '?'}   "
                          f"minimap: {'yes (dungeon)' if hud.has_minimap(f) else 'no (trial)'}")
+        if hueco.is_hueco(f) or hueco.card_screen(f, g.tpl):
+            hm = hueco.read_map(f)
+            sp = hueco.read_spots(f)
+            lines.append(f"Hueco Mundo: wave {hueco.read_wave(f)} · spots {sp.text if sp else '?'} · "
+                         f"you {'?' if not hm or hm.player is None else tuple(round(v) for v in hm.player)} · "
+                         f"{len(hm.skulls) if hm else 0} skull(s) on the map"
+                         + (" · CARD VOTE on screen" if hueco.card_screen(f, g.tpl) else ""))
         t = time.perf_counter()
         v = mm.MapReader().parse(hud.minimap_crop(f))
         ms = (time.perf_counter() - t) * 1000
@@ -545,28 +595,35 @@ class App:
         for r, (val, txt) in enumerate((("culling", "Culling Game"),
                                         ("dungeon", "Dungeons (waits for the Dungeon popup)"),
                                         ("both", "Culling Game, and jump into Dungeons when they pop up"),
-                                        ("defense", "Dungeons, and Defense in between (the game plays Defense)")),
+                                        ("defense", "Dungeons, and Defense in between (the game plays Defense)"),
+                                        ("hueco", "Hueco Mundo (Soul Society's purple key), and leave after wave")),
                                        start=1):
             ttk.Radiobutton(w, text=txt, value=val, variable=self.mode_var, command=self._picked).grid(
                 row=r, column=0, columnspan=3, **pad)
+        self.hm_leave_var = tk.StringVar(value=str(self.S.get("hueco_leave_after", 10)))
+        ttk.Entry(w, textvariable=self.hm_leave_var, width=5).grid(row=5, column=2, padx=4, sticky="w")
+        self.hm_leave_var.trace_add("write", lambda *a: self._picked())
+        self.hm_pop_var = tk.BooleanVar(value=bool(self.S.get("hueco_leave_for_popups", True)))
+        ttk.Checkbutton(w, text="      Leave Hueco Mundo for Dungeon / Trial popups (off = finish the run first)",
+                        variable=self.hm_pop_var, command=self._picked).grid(row=6, column=0, columnspan=3, **pad)
         self.trial_var = tk.BooleanVar(value=self.S["join_trials"])
         ttk.Checkbutton(w, text="Also join Trials when they pop up, and leave after wave", variable=self.trial_var,
-                        command=self._picked).grid(row=5, column=0, columnspan=2, **pad)
+                        command=self._picked).grid(row=7, column=0, columnspan=2, **pad)
         self.leave_var = tk.StringVar(value=str(self.S["trial_leave_after"]))
         e = ttk.Entry(w, textvariable=self.leave_var, width=5)
-        e.grid(row=5, column=2, padx=4, sticky="w")
+        e.grid(row=7, column=2, padx=4, sticky="w")
         self.leave_var.trace_add("write", lambda *a: self._picked())
         self.mount_var = tk.BooleanVar(value=bool(self.S.get("ride_mount", True)))
-        ttk.Checkbutton(w, text="Ride the mount (M) in dungeons",
-                        variable=self.mount_var, command=self._picked).grid(row=6, column=0, columnspan=3, **pad)
+        ttk.Checkbutton(w, text="Ride the mount (M) in dungeons and Hueco Mundo",
+                        variable=self.mount_var, command=self._picked).grid(row=8, column=0, columnspan=3, **pad)
         self.boss_var = tk.BooleanVar(value=bool(self.S.get("world_boss", False)))
         ttk.Checkbutton(w, text="World boss at the top of every hour (Map 4), then back to Map 5",
-                        variable=self.boss_var, command=self._picked).grid(row=7, column=0, columnspan=3, **pad)
+                        variable=self.boss_var, command=self._picked).grid(row=9, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Test the walk", command=lambda: (self._picked(), w.withdraw(), self.farm.test_boss_walk())
-                   ).grid(row=7, column=3, padx=4, sticky="w")
+                   ).grid(row=9, column=3, padx=4, sticky="w")
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
-            row=8, column=0, padx=12, pady=10, sticky="w")
-        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=8, column=1, columnspan=2,
+            row=10, column=0, padx=12, pady=10, sticky="w")
+        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=10, column=1, columnspan=2,
                                                                                sticky="w")
         self.settings_win = w
         w.withdraw()
@@ -576,6 +633,12 @@ class App:
         self.S["join_trials"] = bool(self.trial_var.get())
         self.S["ride_mount"] = bool(self.mount_var.get())
         self.S["world_boss"] = bool(self.boss_var.get())
+        self.S["hueco_mount"] = self.S["ride_mount"]
+        self.S["hueco_leave_for_popups"] = bool(self.hm_pop_var.get())
+        try:
+            self.S["hueco_leave_after"] = int(self.hm_leave_var.get())
+        except ValueError:
+            pass
         try:
             self.S["trial_leave_after"] = int(self.leave_var.get())
         except ValueError:

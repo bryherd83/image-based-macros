@@ -54,6 +54,10 @@ REGIONS = {
     # the orange key on Dragon City's card in the Worlds menu: opens Defense (like the dice for
     # the Culling Game on Cursed Academy's card)
     "key": ((0.15, 0.25, 0.85, 0.85), 70),
+    # Hueco Mundo: the purple key on Soul Society's card (Teleport menu), and the title of the
+    # "CHOOSE A CARD" vote between waves (hueco.py)
+    "hmkey": ((0.15, 0.25, 0.85, 0.85), 70),
+    "hmcards": ((0.25, 0.05, 0.75, 0.30), 70),
 }
 
 
