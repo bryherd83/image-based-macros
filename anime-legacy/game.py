@@ -214,6 +214,10 @@ class Logger:
             self.line(f"cleanup: deleted {n} screenshot(s) older than {hours}h")
 
 
+# where camera drags start (share of the window): beside your character, clear of the HUD
+DRAG_SPOTS = ((0.72, 0.62), (0.28, 0.62), (0.72, 0.72))
+
+
 class Game:
     """Everything the farm needs from the game: frames, readers, input. Thread: the farm worker."""
 
@@ -399,7 +403,12 @@ class Game:
             return
         W, H = self.size()
         self.zoom_hover = None
-        winio.move_to(*self.to_screen(W // 2, round(H * 0.45)))
+        # not the middle of the screen: your own name label can sit right there, and then no drag
+        # turned the camera until Spawn moved you (6-12 turns in a row, 7.7 s each, 11-02 03:33, 06:02,
+        # 06:07: 40-90 s lost each). A drag after a lost one starts somewhere else again
+        self.drag_i = getattr(self, "drag_i", 0) + 1 if slow else 0
+        x, y = DRAG_SPOTS[self.drag_i % len(DRAG_SPOTS)]
+        winio.move_to(*self.to_screen(round(W * x), round(H * y)))
         time.sleep(0.04)
         winio.right_drag(px, slow=slow)
 

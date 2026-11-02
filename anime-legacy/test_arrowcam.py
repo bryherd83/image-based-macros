@@ -24,4 +24,20 @@ for kw in ({"drag_fail": 0.5}, {"drag_fail": 0.5, "mount": 2.4}, {"k_true": 750.
         stuck = sum(m.startswith("stuck") for m in lines)
         print(kw, seed, f"{env.t / 60:.1f} min, stuck {stuck}")
         assert env.t / 60 < 9.5 and stuck <= 3, (kw, seed, env.t, stuck)
+
+# drags don't start on your name label in the middle of the screen (no drag turned the camera,
+# 11-02 03:33, 06:02, 06:07), and one after a lost drag starts somewhere else
+import types  # noqa: E402
+import game  # noqa: E402
+spots = []
+real = game.winio.move_to, game.winio.right_drag
+game.winio.move_to, game.winio.right_drag = lambda x, y: spots.append((x, y)), lambda px, slow=False: None
+try:
+    g = types.SimpleNamespace(active=lambda: True, rect=(0, 0), size=lambda: (1920, 1080), to_screen=lambda x, y: (x, y))
+    for slow in (False, True, True, True, False):
+        game.Game.cam_drag(g, 300, slow=slow)
+finally:
+    game.winio.move_to, game.winio.right_drag = real
+assert spots[0] == spots[4] == spots[3] and len(set(spots[:3])) == 3, spots
+assert all(abs(x - 960) > 300 and 500 < y < 880 for x, y in spots), spots
 print("arrow camera: ok")
