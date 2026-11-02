@@ -275,6 +275,9 @@ class Farm:
                 time.sleep(1.0)
                 return
         self.popup_watch(g, mode)
+        if mode == "alt":
+            self.alt_tick(g, culling, f)
+            return
         # ---- in Hueco Mundo? (its own HUD: a SPOTS counter and a light map; must come before the
         # dungeon / trial check below, which would take it for a trial)
         if in_hueco or (mode == "hueco" and hueco.card_screen(f, g.tpl)):
@@ -354,6 +357,59 @@ class Farm:
             culling.hueco_tick(f)
             return
         culling.tick(f)
+
+    def alt_tick(self, g: Game, culling: Culling, f):
+        """Mode 'alt' (a second account on another PC, Blayne 11-01): the popups are joined by tick;
+        here it only stands still, so it never gets in the way of the main account. A dungeon ends
+        by itself; a trial is left after trial_leave_after. Nobody clearing it (wave stuck in a
+        trial, a dungeon far too long) = Leave, or it would stay in there and miss every popup."""
+        S = self.S
+        now = time.monotonic()
+        if g.find("roomhud", f) is None:
+            self._alt = None
+            g.info["run"] = "-"
+            culling.waiting_room(f)
+            return
+        if g.housekeeping():
+            return
+        run = getattr(self, "_alt", None)
+        if run is None:
+            run = self._alt = {"kind": "trial", "t0": now, "wave": None, "wave_t": now}
+        if hud.has_minimap(f):
+            run["kind"] = "dungeon"
+        g.info["run"] = run["kind"]
+        culling.anti_afk()
+        why = None
+        if run["kind"] == "dungeon":
+            limit = float(S.get("alt_dungeon_max_sec", 900))
+            if now - run["t0"] > limit:
+                why = f"dungeon still going after {limit / 60:.0f} min"
+        else:
+            wv, en = hud.read_counter(f, "wave"), hud.read_counter(f, "enemies")
+            g.info["wave"] = wv.text if wv else "?"
+            g.info["enemies"] = en.text if en else "?"
+            if wv and wv.a != run["wave"]:
+                run["wave"], run["wave_t"] = wv.a, now
+            leave_at = int(S["trial_leave_after"])
+            give_up = float(S.get("trial_give_up_sec", 180))
+            # (not in the first seconds: a dimmed dungeon map looks like a trial for a moment, and
+            # a dungeon's room counter would read as the wave)
+            if now - run["t0"] < 5:
+                pass
+            elif wv and (wv.a > leave_at or (wv.a == leave_at and en and en.b > 0 and en.a >= en.b)):
+                why = f"wave {wv.a} done"
+            elif give_up > 0 and now - run["wave_t"] > give_up:
+                why = f"wave {run['wave']} not cleared for {give_up:.0f}s"
+        if why:
+            c = g.find("leave", f)
+            if c:
+                g.click(*c)
+                g.log(f"alt: {why} · leaving")
+                g.shot(f"alt-left-{run['kind']}", force=True)
+                self._alt = None
+                time.sleep(3)
+                return
+        g.status(f"alt: in the {run['kind']} · standing still")
 
     def run_hueco(self, g: Game, culling: Culling):
         g.info["run"] = "hueco"
@@ -596,7 +652,8 @@ class App:
                                         ("dungeon", "Dungeons (waits for the Dungeon popup)"),
                                         ("both", "Culling Game, and jump into Dungeons when they pop up"),
                                         ("defense", "Dungeons, and Defense in between (the game plays Defense)"),
-                                        ("hueco", "Hueco Mundo (Soul Society's purple key), and leave after wave")),
+                                        ("hueco", "Hueco Mundo (Soul Society's purple key), and leave after wave"),
+                                        ("alt", "Alt: join Dungeons and Trials and stand still (leaves when they're done)")),
                                        start=1):
             ttk.Radiobutton(w, text=txt, value=val, variable=self.mode_var, command=self._picked).grid(
                 row=r, column=0, columnspan=3, **pad)
@@ -605,25 +662,25 @@ class App:
         self.hm_leave_var.trace_add("write", lambda *a: self._picked())
         self.hm_pop_var = tk.BooleanVar(value=bool(self.S.get("hueco_leave_for_popups", True)))
         ttk.Checkbutton(w, text="      Leave Hueco Mundo for Dungeon / Trial popups (off = finish the run first)",
-                        variable=self.hm_pop_var, command=self._picked).grid(row=6, column=0, columnspan=3, **pad)
+                        variable=self.hm_pop_var, command=self._picked).grid(row=7, column=0, columnspan=3, **pad)
         self.trial_var = tk.BooleanVar(value=self.S["join_trials"])
         ttk.Checkbutton(w, text="Also join Trials when they pop up, and leave after wave", variable=self.trial_var,
-                        command=self._picked).grid(row=7, column=0, columnspan=2, **pad)
+                        command=self._picked).grid(row=8, column=0, columnspan=2, **pad)
         self.leave_var = tk.StringVar(value=str(self.S["trial_leave_after"]))
         e = ttk.Entry(w, textvariable=self.leave_var, width=5)
-        e.grid(row=7, column=2, padx=4, sticky="w")
+        e.grid(row=8, column=2, padx=4, sticky="w")
         self.leave_var.trace_add("write", lambda *a: self._picked())
         self.mount_var = tk.BooleanVar(value=bool(self.S.get("ride_mount", True)))
         ttk.Checkbutton(w, text="Ride the mount (M) in dungeons and Hueco Mundo",
-                        variable=self.mount_var, command=self._picked).grid(row=8, column=0, columnspan=3, **pad)
+                        variable=self.mount_var, command=self._picked).grid(row=9, column=0, columnspan=3, **pad)
         self.boss_var = tk.BooleanVar(value=bool(self.S.get("world_boss", False)))
         ttk.Checkbutton(w, text="World boss at the top of every hour (Map 4), then back to Map 5",
-                        variable=self.boss_var, command=self._picked).grid(row=9, column=0, columnspan=3, **pad)
+                        variable=self.boss_var, command=self._picked).grid(row=10, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Test the walk", command=lambda: (self._picked(), w.withdraw(), self.farm.test_boss_walk())
-                   ).grid(row=9, column=3, padx=4, sticky="w")
+                   ).grid(row=10, column=3, padx=4, sticky="w")
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
-            row=10, column=0, padx=12, pady=10, sticky="w")
-        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=10, column=1, columnspan=2,
+            row=11, column=0, padx=12, pady=10, sticky="w")
+        ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=11, column=1, columnspan=2,
                                                                                sticky="w")
         self.settings_win = w
         w.withdraw()

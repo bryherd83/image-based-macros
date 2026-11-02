@@ -20,7 +20,8 @@ SETTINGS_FILE = os.path.join(HERE, "settings.json")
 AHK_INI = os.path.expandvars(r"%USERPROFILE%\Downloads\anime-legacy-settings.ini")
 
 DEFAULTS = {
-    "mode": "dungeon",                 # culling | dungeon | both | defense | hueco
+    "mode": "dungeon",                 # culling | dungeon | both | defense | hueco | alt
+    "alt_dungeon_max_sec": 900,        # alt: press Leave if a dungeon is still going after this long
     "join_trials": True,
     "trial_leave_after": 27,
     "leave_at_wave": 9,                # Culling Game: leave when the wave counter reaches this (0 = never)

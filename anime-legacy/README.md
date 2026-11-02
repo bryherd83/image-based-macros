@@ -12,6 +12,7 @@ executor and no script injection.
 | **Trials** | Joins the Trial popup (at :16:40 and :46:40). Presses Spawn, walks straight into each room until the DPS meter shows it's hitting, and moves on when the wave is cleared. Leaves after a chosen wave. About 3.5 minutes to wave 24. |
 | **Culling Game** | Waits in the lobby, joins, and leaves at a chosen wave. |
 | **Hueco Mundo** | Opens it from Soul Society's purple key (Teleport menu → Create → Play) and closes the windows left open. Each wave it walks to the red skulls on the minimap one by one (nearest first, riding the mount) and stays until each group is dead. Presses Spawn when walking from spawn is quicker, and jumps over rocks. Votes in the card picks (cards in `assets/hmcard_1_*.png`, then `hmcard_2_*.png`, else a red Risk & Reward card). Leaves after wave 10. |
+| **Alt** | For a second account on another PC. Joins the Dungeon and Trial popups and stands still. Stays until the dungeon ends, and leaves a trial after the wave set in F5. Presses Leave if nobody is clearing it (a trial wave stuck for 3 minutes, a dungeon still going after 15). |
 
 **Dungeon + Trial together:** a dungeon that's still clearing rooms is finished first. If it's
 stuck (no new room for 2 minutes) when the Trial pops up, it leaves for the Trial.
@@ -82,7 +83,8 @@ you may want to change:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `mode` | `dungeon` | `dungeon`, `culling`, `both` (Culling + dungeons), `defense` (dungeons, and Defense in between: opens Dragon City's key, Create, Play, then lets the game play it) or `hueco` (Hueco Mundo, see below) |
+| `mode` | `dungeon` | `dungeon`, `culling`, `both` (Culling + dungeons), `defense` (dungeons, and Defense in between: opens Dragon City's key, Create, Play, then lets the game play it), `hueco` (Hueco Mundo, see below) or `alt` (join and stand still) |
+| `alt_dungeon_max_sec` | `900` | Alt mode: press Leave if a dungeon is still going after this long |
 | `hueco_leave_after` | `10` | Hueco Mundo: press Leave once this wave is cleared (F5 box) |
 | `hueco_leave_for_popups` | `true` | Hueco Mundo: join the Dungeon / Trial popups (that ends the run). `false` = finish the run first (F5 box) |
 | `hueco_not_before_popup_sec` | `300` | Hueco Mundo (with the above on): don't start a run when a popup is due this soon |
