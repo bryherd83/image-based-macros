@@ -450,6 +450,7 @@ class Farm:
                 self.boss.dungeon_finished()
             try:
                 g.log(f"dungeon time: {run.time_summary()}")
+                g.log(f"dungeon camera: {run.turn_summary()}")
             except Exception:
                 pass
             g.log(f"dungeon finished · {run.rooms_cleared} rooms cleared by the macro in {mins:.1f} min "

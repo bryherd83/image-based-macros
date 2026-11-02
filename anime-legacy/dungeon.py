@@ -424,6 +424,7 @@ class DungeonRun:
         self._say_t = None
         self.turn_settle = float(S.get("turn_settle_sec", 0.25))
         self.lost_drags = 0            # drags in a row that didn't turn the camera at all
+        self.turn_stats = {"n": 0, "sec": 0.0, "drags": 0, "lost": 0, "careful": 0, "no_arrow": 0}
         self.no_route_since = None
         self.spawn_shortcut = bool(S.get("spawn_shortcut", True))   # press Spawn when quicker
         self.last_progress_t = env.now()
@@ -501,6 +502,11 @@ class DungeonRun:
     def time_summary(self):
         t = self.time_in
         return " · ".join(f"{k} {v:.0f}s" for k, v in sorted(t.items(), key=lambda kv: -kv[1]) if v >= 1)
+
+    def turn_summary(self):
+        s = self.turn_stats
+        return (f"{s['n']} turns · {s['sec'] / max(1, s['n']):.1f}s each · {s['drags']} drags · "
+                f"{s['lost']} didn't turn · {s['careful']} careful · {s['no_arrow']} arrow not read")
 
     def say(self, msg):
         now = self.env.now()
@@ -695,7 +701,9 @@ class DungeonRun:
 
     def _drag(self, px):
         """A camera drag; the careful kind after one that didn't turn the camera at all."""
+        self.turn_stats["drags"] += 1
         if self.lost_drags:
+            self.turn_stats["careful"] += 1
             try:
                 self.env.cam_drag(px, slow=True)
                 return
@@ -715,6 +723,7 @@ class DungeonRun:
         a0 = self.env.arrow()
         px = round(d * h.k)
         self.say(f"turning the camera to face the door ({math.degrees(d):+.0f} deg)")
+        t0, drags0 = self.env.now(), self.turn_stats["drags"]
         self._drag(px)
         h.turned_by_mouse(px)
         if self.arrow_cam and a0 is not None:
@@ -724,10 +733,12 @@ class DungeonRun:
                 self.env.sleep(self.turn_settle)
                 a1 = self.env.arrow()
                 if a1 is None:
+                    self.turn_stats["no_arrow"] += 1
                     break
                 turned = wrap(a1 - a0)
                 if abs(px) > 100:
                     if abs(turned) < 0.05:
+                        self.turn_stats["lost"] += 1
                         self.lost_drags += 1
                         if self.lost_drags == 2:
                             self.env.log("camera didn't turn on 2 drags in a row · turning more carefully")
@@ -741,6 +752,14 @@ class DungeonRun:
                     break
                 a0, px = a1, round(left * h.k)
                 self._drag(px)
+            # what a turn costs and why: some dungeons took twice as long per turn with nothing in
+            # the log to say why (11-01 21:39: 2.5 s a turn, 22:06: 1.25 s)
+            sec = self.env.now() - t0
+            self.turn_stats["n"] += 1
+            self.turn_stats["sec"] += sec
+            if sec > 4:
+                self.env.log(f"slow camera turn: {sec:.1f}s · {math.degrees(d):+.0f} deg · "
+                             f"{self.turn_stats['drags'] - drags0} drag(s)")
             self.last_turn = (edge, self.env.now())
             self.turns_here += 1
             self.progress_ref = None        # (turning took a moment: not 'stuck')
