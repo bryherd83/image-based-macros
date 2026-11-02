@@ -242,6 +242,11 @@ class MapReader:
                 lm, l1, l2 = lavs
                 lav_tab = lm >= (3 if s >= 20 else 2) and l1 <= 0.4 * lm and l2 <= 0.4 * lm \
                     and (thick >= 2 or s < 20)
+                # your room's white outline can class as lavender too: a line 2 px thick that goes
+                # no further across the gap than the outline does. Read as a door south of a
+                # treasure room, it ran into that wall and swung between two routes (11-02 08:05)
+                if lav_tab and (0, 0) in ((a, b), k2) and s >= 20 and thick <= 2 and own_tab(mx, my, g) <= 3:
+                    lav_tab = False
                 tab = nm >= 2 and mid >= 0.35 and (n1 == 0 or e1 < 0.6 * mid) and (n2 == 0 or e2 < 0.6 * mid)
                 if (0, 0) in ((a, b), k2):
                     # your room's white outline lies in these gaps (and its rounded corners

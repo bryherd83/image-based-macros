@@ -96,3 +96,10 @@ c2 = env.stats["zoom_clicks"] - c1
 print("zoom clicks:", c1, c2)
 assert c2 <= 4, c2
 print("doorway + zoom: ok")
+
+# your room's white outline read as a door south of a treasure room: it kept running into that
+# wall, swinging between that "door" and the real one east (11-02 08:05, frames from the trace)
+for name in ("080526", "080536"):
+    v = mm.MapReader().parse(cv2.imread(os.path.join(HERE, "testdata", "screens", f"treasure-wall-{name}.png")))
+    assert ((0, 0), (0, 1)) not in v.doors and ((0, 0), (1, 0)) in v.doors, (name, sorted(v.doors))
+print("outline isn't a door: ok")
