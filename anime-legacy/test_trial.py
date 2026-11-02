@@ -48,7 +48,8 @@ FAKE_HUD = types.SimpleNamespace(
 
 class TrialSim:
     def __init__(self, scene, seed, reach=0.22, dps=True, waves=22, limit=25 * 60, spawn_at=0.0,
-                 onset=0.0, hold=DPS_LAG, teleport=(0.3, 0.7), seen=True):
+                 onset=0.0, hold=DPS_LAG, teleport=(0.3, 0.7), seen=True, instant=False):
+        self.instant = instant                   # a unit teleports to the enemies: dead on arrival
         self.r = random.Random(seed)
         self.r2 = random.Random(seed + 1000)     # Spawn timing (keeps the rooms the same per seed)
         self.place = SCENES[scene]
@@ -79,6 +80,9 @@ class TrialSim:
         self.room_t = self.t
         self.last_in_reach = -9.0
         self.cleared = False
+        if self.instant and self.wave > 1:
+            for e in self.en:
+                e[2] = KILL_SEC
 
     def _killed(self):
         return sum(1 for e in self.en if e[2] >= KILL_SEC)
@@ -251,3 +255,12 @@ if __name__ == "__main__":
     kw = {"onset": 1.0, "hold": 4.0}
     print("  before:", summary([run(old, "deep (like your 19:47 trial)", s, **kw) for s in range(n)]))
     print("  now:   ", summary([run(trial_new, "deep (like your 19:47 trial)", s, **kw) for s in range(n)]))
+    # a unit that teleports to the enemies: all dead before the walk-in ends, same enemy count
+    # every room (13.4 s a room, Blayne 11-01)
+    print("\nenemies dead on arrival: before → now")
+    fast = [run(trial_new, "spread over the room", s, instant=True) for s in range(n)]
+    print("  before:", summary([run(old, "spread over the room", s, instant=True) for s in range(n)]))
+    print("  now:   ", summary(fast))
+    assert all(s.left and s.t / s.leave_after < 6 for s in fast), [round(s.t / s.leave_after, 1) for s in fast]
+    # nothing skipped: every wave up to the set one was reached
+    assert all(s.wave == s.leave_after for s in fast), [s.wave for s in fast]

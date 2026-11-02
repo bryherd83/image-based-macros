@@ -258,6 +258,7 @@ def run_trial(env, mode, leave_after):
     same_wave, last_wave_done = 0, None
     unreached_since = None        # first Spawn retry in the room being fought (None = none yet)
     covered_since = 0.0
+    spawn_wave = None             # the wave number when Spawn was last pressed
     env.sleep(1.5)
     sprint_off_for_trial(env, S)
     f = env.frame()
@@ -369,6 +370,7 @@ def run_trial(env, mode, leave_after):
             clip = getattr(env, "clip", None)
             if clip:
                 clip("trial: couldn't reach the enemies")
+            spawn_wave = wv.a if wv else None
             r = spawn_and_walk(clean=hitting is False)
             if r:
                 r.saw_fight, r.learn = False, False
@@ -419,7 +421,11 @@ def run_trial(env, mode, leave_after):
                 continue
         full = en and en.b > 0 and en.a >= en.b
         empty_sec = float(S.get("trial_empty_room_sec", 5))
-        cleared = full and (room.saw_fight or waited >= empty_sec + 4)
+        # a unit that teleports to the enemies kills them during Spawn's black screen, so no fight
+        # is ever seen; with the same enemy count as the last room that looked like the old room's
+        # counter, and it waited out the 9 s (13.4 s a room, Blayne 11-01). A new wave number = new room
+        new_wave = spawn_wave is not None and wv is not None and wv.a != spawn_wave
+        cleared = full and (room.saw_fight or new_wave or waited >= empty_sec + 4)
         empty = en and en.b == 0 and waited >= empty_sec
         clear_since = (clear_since or now) if (cleared or empty) else 0.0
         if not clear_since:
@@ -468,6 +474,7 @@ def run_trial(env, mode, leave_after):
             env.release_all()
             old = en_t
             cycle_t0 = env.now()
+            spawn_wave = wv.a if wv else None
             r = spawn_and_walk(old, clean=meter_clean)
             if r:
                 env.status(f"trial wave {wv_t} cleared · Spawn + walk in")
