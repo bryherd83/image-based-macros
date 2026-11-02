@@ -23,6 +23,8 @@ WANT = {  # file: (in a run, wave, spots, (you x, y) or None, skulls)
     "s115.png": (True, 2, "3/5", (34, 36), 3),         # arrow pointing SE, touching a skull (18:06)
     "s116.png": (True, 2, "2/5", (42, 43), 2),         # arrow on the middle of a cleared spot
     "s117.png": (True, 1, "1/3", (-22, 71), 1),        # last skull by the S badge, at 91 px (froze 18:12)
+    "rim2.jpg": (True, 3, "2/3", (46, 47), 2),         # two skulls cut off by the map's edge (11-02 08:10)
+    "rim1.jpg": (True, 2, "1/5", (-25, 29), 1),        # one cut off by the west edge (08:09)
     "s104.png": (False, None, None, None, 0),
     "s107.png": (False, None, None, None, 0),
 }
@@ -42,7 +44,9 @@ if os.path.isdir(SHOTS):
         assert sp is not None and sp.text == spots, (name, sp)
         assert m.player is not None and math.hypot(m.player[0] - you[0], m.player[1] - you[1]) < 2.5, (name, m.player)
         assert len(m.skulls) == n, (name, m.skulls)
-        want_arrow = {"s114.png": -math.pi / 2, "s115.png": math.radians(45)}.get(name, math.pi / 2)
+        want_arrow = {"s114.png": -math.pi / 2, "s115.png": math.radians(45), "rim2.jpg": 0.84,
+                      "rim1.jpg": math.pi}.get(name, math.pi / 2)
+        assert all(math.hypot(*sk) <= 92.5 for sk in m.skulls), (name, m.skulls)      # walkable
         if name == "s117.png":
             want_arrow = math.radians(84)
         if name != "s116.png":

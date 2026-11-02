@@ -264,6 +264,20 @@ def read_map(frame, prev=None) -> HMap | None:
     for q in comps(red_c):
         if all(math.hypot(q[0] - k[0], q[1] - k[1]) > 8 for k in skulls):
             skulls.append(q)
+    # a skull on the map's edge is cut off (only ~35-65 red px, its face can split them), too small
+    # to count: "no spots left" with 2/3 to go (11-02 08:10). Nothing else red is out there. The
+    # middle of what shows is good enough, and the ring can't be used (it's black past the edge)
+    # shortcut: walks only to 92 px from the map's middle, so your arrow stays readable (98 px); if
+    # enemies out there stay out of reach, the spot is given up after 120 s and this needs a rethink
+    rim = red & ((xx - R) ** 2 + (yy - R) ** 2 >= (R - 25 * sy) ** 2)
+    k = max(3, round(13 * sy)) | 1
+    n, lab, st, _ = cv2.connectedComponentsWithStats(cv2.morphologyEx(rim.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((k, k), np.uint8)), connectivity=8)
+    for i in range(1, n):
+        x, y, w, h, _ = (int(v) for v in st[i])
+        q = ((x + (w - 1) / 2 - R) / sy, (y + (h - 1) / 2 - R) / sy)
+        q = (q[0] * min(1.0, 92 / math.hypot(*q)), q[1] * min(1.0, 92 / math.hypot(*q)))
+        if (rim & (lab == i)).sum() >= 25 * sy * sy and all(math.hypot(q[0] - s[0], q[1] - s[1]) > 16 for s in skulls):
+            skulls.append(q)
     # spawn: the black-and-gold diamond in the middle of the map (the map doesn't move)
     spawn = (-1.0, -1.0)
     # you: the white arrow (12x17 px, any way round). Not the skulls' white faces (11x11), the
