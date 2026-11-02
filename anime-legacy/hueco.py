@@ -37,6 +37,8 @@ CENTER_PX = 1.5                 # "in the middle of the skull": this close (map 
 ARRIVE_PX = 4.0                 # at a skull when this close (map px at the default zoom)
 NEAR_PX = 14                    # closer than this: short taps, so it stops on the spot
 RIM_PX = 85                     # further than this from the map's middle: "out by the rim"
+RIM_NEAR_PX = 14.0              # as near as it gets there: the map can end this short of a skull
+REACH_SEC = 40                  # still not at a spot after this long: try another for now
 RIM_CENTER_PX = 4.0             # CENTER_PX for a skull out there (it and your arrow read less exactly)
 CARD_X = (570, 960, 1350)       # the three cards of the "CHOOSE A CARD" screen (1920 px)
 
@@ -102,45 +104,54 @@ def _card_kinds(frame):
             px.append(frame[y0 - 8:y0 + 8, x0 - 4:x0 + 4].reshape(-1, 3).astype(float))
         p = np.vstack(px)
         b, g, r = p.mean(axis=0) if p.size else (0, 0, 0)
-        out.append("buff" if g >= 0.6 * r else "risk")
+        # (purple Hogyoku Gamble, blue 1.2 of red, also read as red: its random card can be Sealed Spots)
+        out.append("risk" if g < 0.6 * r and b < 0.85 * r else "buff")
     return out
 
 
-def card_pictures(folder=hud.ASSETS):
+def card_pictures(folder=hud.ASSETS, pattern="hmcard_*.png"):
     """Card title pictures in priority order: assets/hmcard_1_*.png first, then hmcard_2_*.png...
     (1 = "50%+ more mobs", 2 = drops, e.g. "Espada Challenge": +1 drop roll). Add a picture of a
     card's title plate there to have it picked first."""
     import glob, os
     out = []
-    for p in sorted(glob.glob(os.path.join(folder, "hmcard_*.png"))):
+    for p in sorted(glob.glob(os.path.join(folder, pattern))):
         im = cv2.imread(p, cv2.IMREAD_COLOR)
         if im is not None:
             out.append((os.path.basename(p), im))
     return out
 
 
-def pick_card(frame, pictures=()):
-    """Which card to vote for (1-3) and why: a card from the priority list (more mobs, then drops),
-    else a red RISK & REWARD card (more enemies / bosses = more drops), else card 1."""
+def _title_is(frame, tpl, x):
+    """The card at `x` has this title plate."""
     sx, sy = hud.map_scale(frame)
+    th, tw = tpl.shape[:2]
+    x0, x1 = max(0, round((x - 200) * sx)), round((x + 200) * sx)
+    y0, y1 = round(540 * sy), round(620 * sy)
+    sub = frame[y0:y1, x0:x1]
+    if sub.shape[0] < th or sub.shape[1] < tw:
+        return False
+    res = cv2.matchTemplate(sub, tpl, cv2.TM_SQDIFF)
+    _, _, loc, _ = cv2.minMaxLoc(res)
+    patch = sub[loc[1]:loc[1] + th, loc[0]:loc[0] + tw].astype(np.int16)
+    return (np.abs(patch - tpl.astype(np.int16)).max(axis=2) <= 70).mean() >= 0.9
+
+
+def pick_card(frame, pictures=(), avoid=()):
+    """Which card to vote for (1-3) and why: a card from the priority list (more mobs, then drops),
+    else a red RISK & REWARD card (more enemies / bosses = more drops), else the first one. Never
+    one in `avoid`: Sealed Spots is red, and with it no skull shows on the map for the rest of the
+    run (11-02 13:43:38, 14:30:35), unless all three are to be avoided."""
+    ok = [i for i, x in enumerate(CARD_X, start=1) if not any(_title_is(frame, t, x) for _, t in avoid)] or [1, 2, 3]
     for name, tpl in pictures:
-        th, tw = tpl.shape[:2]
-        for i, x in enumerate(CARD_X, start=1):
-            x0, x1 = max(0, round((x - 200) * sx)), round((x + 200) * sx)
-            y0, y1 = round(540 * sy), round(620 * sy)
-            sub = frame[y0:y1, x0:x1]
-            if sub.shape[0] < th or sub.shape[1] < tw:
-                continue
-            res = cv2.matchTemplate(sub, tpl, cv2.TM_SQDIFF)
-            _, _, loc, _ = cv2.minMaxLoc(res)
-            patch = sub[loc[1]:loc[1] + th, loc[0]:loc[0] + tw].astype(np.int16)
-            ok = (np.abs(patch - tpl.astype(np.int16)).max(axis=2) <= 70).mean()
-            if ok >= 0.9:
+        for i in ok:
+            if _title_is(frame, tpl, CARD_X[i - 1]):
                 return i, name.rsplit(".", 1)[0]
     kinds = _card_kinds(frame)
-    if "risk" in kinds:
-        return kinds.index("risk") + 1, "risk & reward"
-    return 1, "first card"
+    for i in ok:
+        if kinds[i - 1] == "risk":
+            return i, "risk & reward"
+    return ok[0], "first card"
 
 
 # ---- your arrow, found by its shape: a white arrow with a dark outline 2-3 px out ----
@@ -494,6 +505,7 @@ class HuecoRun:
         self.tick_t = env.now()
         self.card_t = -1e9
         self.cards = card_pictures()
+        self.avoid = card_pictures(pattern="hmavoid_*.png")
         self.sweep_i = 0
 
     # ---- small helpers ----
@@ -570,7 +582,7 @@ class HuecoRun:
                 misses = 0
                 if now - self.card_t > 3:
                     self.card_t = now
-                    i, why = pick_card(f, self.cards)
+                    i, why = pick_card(f, self.cards, self.avoid)
                     # (a picture of each vote: a card that hides the map got picked and no vote
                     # screen showed its name, 11-02 13:43:38)
                     e.shot("hueco-card-vote", force=True)
@@ -780,10 +792,19 @@ class HuecoRun:
             on_rim = math.hypot(*best) >= RIM_PX
             # (out there the map may end short of the skull: as near as it gets after 20 s will do)
             if lk["arrived"] is None and (d <= (RIM_CENTER_PX if on_rim else CENTER_PX)
-                                          or (on_rim and d < 12 and now - lk["t"] > 20)):
+                                          or (on_rim and d < RIM_NEAR_PX and now - lk["t"] > 20)):
                 lk["arrived"] = now
                 self.at_target_since = now
                 self.stucks, self.tap_ref = 0, None
+            if lk["arrived"] is None and now - lk["t"] > REACH_SEC:
+                # standing 12 px off a skull with 3 other spots left until the wave ran out, and the
+                # run was lost (11-02 14:25:34). The timer below only starts once you're there
+                self.skip[(round(best[0] / 4), round(best[1] / 4))] = now + 30
+                e.log(f"Hueco Mundo: couldn't reach the spot in {REACH_SEC}s ({d:.1f}px off) · trying another for now")
+                e.shot("hueco-spot-unreachable", force=True)
+                self.stop()
+                self.lock = None
+                continue
             if lk["arrived"] is None:
                 self.walk(now, (px, py), best, m)
                 self.say(f"walking to the spot · wave {self.wave} · {d:.1f}px")
@@ -810,7 +831,7 @@ class HuecoRun:
                         self.sweep_i, self.last_kill_t = 0, now
                 self.say(f"wave {self.wave} · enemies {self.en_text} · walking round the spot")
                 continue
-            if d > (12.0 if on_rim else 3.0):   # pushed off the middle: back onto it
+            if d > (RIM_NEAR_PX if on_rim else 3.0):   # pushed off the middle: back onto it
                 self.walk(now, (px, py), best, m, close=True)
                 self.say(f"back to the middle of the spot · {d:.1f}px")
                 continue

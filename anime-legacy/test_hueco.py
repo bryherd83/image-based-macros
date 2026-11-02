@@ -276,7 +276,7 @@ def patch():
     hueco.read_wave = lambda f, castle=None: f.wave
     hueco.read_spots = lambda f, castle=None: hud.Counter(len(f.skulls), f.spots_b, f"{len(f.skulls)}/{f.spots_b}")
     hud.read_counter = lambda f, which, **kw: hud.Counter(len(f.skulls), f.spots_b, "x")
-    hueco.pick_card = lambda f, pics=(): (2, "test")
+    hueco.pick_card = lambda f, pics=(), avoid=(): (2, "test")
 
     def read_map(f, prev=None):
         noise = lambda: f.rng.uniform(-0.4, 0.4)  # noqa: E731
@@ -306,6 +306,13 @@ assert not hueco.in_run(f, c, None)
 f = cv2.imread(os.path.join(HERE, "testdata", "hueco", "run-ended-lobby.jpg"))
 assert not hueco.in_run(f, hud.castle_x(f), 8)
 print("still in the run: ok")
+# Sealed Spots hides every skull for the rest of the run and it's red, so it got picked (11-02
+# 14:30:35): now the next best card. Other red cards still count
+avoid = hueco.card_pictures(pattern="hmavoid_*.png")
+vote = cv2.imread(os.path.join(HERE, "testdata", "hueco", "sealed-spots-vote.jpg"))
+assert hueco.pick_card(vote)[0] == 1 and hueco.pick_card(vote, (), avoid) == (2, "first card")
+vote = cv2.imread(os.path.join(HERE, "testdata", "hueco", "vote-time-pressure.jpg"))
+assert hueco.pick_card(vote, (), avoid) == (1, "risk & reward")
 # Leave matches its picture only 89% on Blayne's PC: it stayed on wave 11 (11-02 13:08). No such
 # button in the lobby
 tpl = hud.Templates()
@@ -336,6 +343,29 @@ w = World(13, aura=12.0)
 env = Env(w)
 assert hueco.HuecoRun(env).run() == "left"
 assert any("on the way there" in m for m in env.logs), env.logs[-5:]
+# a skull it can't reach, and it's the nearest: goes to the other one after a while (11-02 14:25:34)
+w = World(14, rocks=False)
+w.skulls, w.spots_b, w.x, w.y = [[130.0, 0.0, 2.0, False], [-20.0, 0.0, 2.0, False]], 2, 70.0, 0.0
+env = Env(w)
+real_log = env.log
+
+
+class Reached(Exception):
+    pass
+
+
+def stop_log(m, *a, **k):
+    real_log(m, *a, **k)
+    if len(w.skulls) < 2:
+        raise Reached
+
+
+env.log = stop_log
+try:
+    hueco.HuecoRun(env).run()
+    raise AssertionError("never got to the other spot")
+except Reached:
+    assert w.skulls[0][0] == 130.0 and any("couldn't reach the spot" in m for m in env.logs), env.logs[-5:]
 # on the mount (you get on before the run): it stays on (M got you off it, 11-02 13:19:12)
 w = World(9, mounted=True)
 env = Env(w)
