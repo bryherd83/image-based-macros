@@ -56,7 +56,8 @@ off, set `"log_send": false` in `settings.json`.
 
 ## Setup
 
-1. Install [Python 3.11+](https://www.python.org/downloads/). Tick **"Add python.exe to PATH"**.
+1. Install Python: **[download Python 3.12 for Windows](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe)** (or any 3.11+ from
+   [python.org](https://www.python.org/downloads/)). Tick **"Add python.exe to PATH"** on the first screen.
 2. Run Roblox **fullscreen at 1920×1080**.
 3. Double-click **`run.bat`**. The first run creates a `.venv` folder and installs `numpy`,
    `opencv-python`, `dxcam` and `comtypes`.

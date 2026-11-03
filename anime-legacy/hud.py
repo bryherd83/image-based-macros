@@ -282,7 +282,7 @@ def new_dps_number_width(frame: np.ndarray) -> int | None:
 
 def dps_kind(frame: np.ndarray) -> str | None:
     """What the DPS number looks like: 'zero' ("0 DPS"), 'small' (1-3 plain digits: the world
-    boss takes only 1-20-odd damage a second, Blayne 10-21), 'big' (a long number with a
+    boss takes only 1-20-odd damage a second, 10-21), 'big' (a long number with a
     decimal point / letter: billions on a normal boss) or None (can't read it)."""
     sx, sy = map_scale(frame)
     x0, y0, x1, y1 = (round(NEW_DPS_BOX[0] * sx), round(NEW_DPS_BOX[1] * sy),

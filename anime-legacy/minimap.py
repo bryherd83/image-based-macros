@@ -256,7 +256,7 @@ class MapReader:
                     tab = False
                 if math.hypot(mx - R, my - R) < max(ARROW_NEAR_MIN, 0.36 * p):
                     # a gap near your arrow says nothing either way: the arrow can hide its dot
-                    # or look like one (Blayne 10-19: read the doors from the middle of the room,
+                    # or look like one (10-19: read the doors from the middle of the room,
                     # not up against a wall). Memory keeps what was read from further away
                     pass
                 elif tab or lav_tab:

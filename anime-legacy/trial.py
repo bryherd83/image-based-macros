@@ -423,7 +423,7 @@ def run_trial(env, mode, leave_after):
         empty_sec = float(S.get("trial_empty_room_sec", 5))
         # a unit that teleports to the enemies kills them during Spawn's black screen, so no fight
         # is ever seen; with the same enemy count as the last room that looked like the old room's
-        # counter, and it waited out the 9 s (13.4 s a room, Blayne 11-01). A new wave number = new room
+        # counter, and it waited out the 9 s (13.4 s a room, 11-01). A new wave number = new room
         new_wave = spawn_wave is not None and wv is not None and wv.a != spawn_wave
         cleared = full and (room.saw_fight or new_wave or waited >= empty_sec + 4)
         empty = en and en.b == 0 and waited >= empty_sec

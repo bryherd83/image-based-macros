@@ -166,7 +166,7 @@ class Memory:
         """Quickest route to an unfinished room: a list of rooms starting with yours, or None.
         Cost = rooms walked + TURN_COST per change of direction (each turn stops to swing the
         camera), and a route may start with pressing Spawn (to the blue room) when that is
-        quicker (Blayne 10-19: from far away it walked the long way round; self.via_spawn).
+        quicker (10-19: from far away it walked the long way round; self.via_spawn).
         With no route through known doors, one that also uses gaps not seen as walls (tiny door
         tabs on the zoomed-out map are easy to miss: laptop 10-19 16:35; self.via_unknown)."""
         p = self._plan(now, False)
@@ -415,9 +415,9 @@ class DungeonRun:
         self.attempt = None            # current door attempt
         self.last_spawn = -1e9
         # camera turns: done within turn_tol (rad), re-aimed at a door past turn_retol. Were 0.12 /
-        # 0.13 (7 deg): the camera ended a few degrees off after most turns (Blayne 10-20)
+        # 0.13 (7 deg): the camera ended a few degrees off after most turns (10-20)
         # (0.05 / 0.08 made the laptop's turns ~2 s each with the extra small corrections:
-        # 4.6 / 5.7 deg keeps them straighter than before without most of those, Blayne 10-20)
+        # 4.6 / 5.7 deg keeps them straighter than before without most of those, 10-20)
         self.turn_tol = float(S.get("turn_tol", 0.08))
         self.turn_retol = float(S.get("turn_retol", 0.10))
         self.time_in: dict = {}        # seconds per activity this dungeon (for the log)
@@ -1070,7 +1070,7 @@ class DungeonRun:
                     and (cell, path[1]) not in self.mem.doors and now >= self.recover_until:
                 # the only way on is a gap with no door seen in it (PC 10-19 20:09: the arrow
                 # covered the wall south of the room, so it counted as maybe a door and the farm
-                # kept running into it). Like Blayne would: look at the whole map first, then
+                # kept running into it). Like a player would: look at the whole map first, then
                 # stand in the middle of the room (the arrow can't cover a door from there) and
                 # read the doors again
                 if now - self.last_scan > 15:
@@ -1174,7 +1174,7 @@ class DungeonRun:
                 yaw_err = wrap(want - self.head.psi)
                 # look at the door first (doors open while you look at them, and walking
                 # straight with W is the most precise way through a narrow doorway)
-                # Blayne's way (10-20): walk on to the door's centre line FIRST, while the camera
+                # The way a player does it (10-20): walk on to the door's centre line FIRST, while the camera
                 # still looks the way you came in (so it's a straight walk, not a sidestep), then
                 # turn the camera to the door, then straight through. Lined up = within
                 # lineup_done, or just walked past the line (no stepping back for an overshoot)
@@ -1200,7 +1200,7 @@ class DungeonRun:
                         # tapped forever and never pressed Spawn - laptop 10-22 16:11)
                         # on the mount: short taps with a pause after each, so the (slow) laptop
                         # sees where it stopped before the next one - holding on the fast mount
-                        # shot past the line and back (Blayne 10-20: "tap slower")
+                        # shot past the line and back (10-20: "tap slower")
                         k = keys_for(vx, vy, self.head.psi)
                         if k:
                             spd = max(self.head.nominal or 0.3, 0.05)
@@ -1214,7 +1214,7 @@ class DungeonRun:
                             continue
                     if S.get("lineup_hold", True):
                         # hold the side key until lined up instead of short taps (taps looked like
-                        # stutter steps at every door, Blayne 10-20); the 0.07 / 0.035 margin
+                        # stutter steps at every door, 10-20); the 0.07 / 0.035 margin
                         # keeps it from swinging back
                         m = math.hypot(vx, vy)
                         if 0 < m < 0.13:

@@ -360,7 +360,7 @@ class Farm:
         culling.tick(f)
 
     def alt_tick(self, g: Game, culling: Culling, f):
-        """Mode 'alt' (a second account on another PC, Blayne 11-01): the popups are joined by tick;
+        """Mode 'alt' (a second account on another PC, 11-01): the popups are joined by tick;
         here it only stands still, so it never gets in the way of the main account. A dungeon ends
         by itself; a trial is left after trial_leave_after. Nobody clearing it (wave stuck in a
         trial, a dungeon far too long) = Leave, or it would stay in there and miss every popup."""

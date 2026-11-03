@@ -31,7 +31,7 @@ from dungeon import keys_for
 MAP_R = 102                     # read radius of the disc: out to its blue rim (a skull by the
                                 # S badge sat at 91 px and wasn't seen: the run froze, 11-01 18:12)
 ARROW_EXTRA = 10                # your arrow is read this much further out: it sticks out past MAP_R
-                                # when you walk round a skull by the rim (lost at 94+ px, Blayne 11-01)
+                                # when you walk round a skull by the rim (lost at 94+ px, 11-01)
 SPAWN_COST_SEC = 2.5            # what pressing Spawn costs, in seconds of walking
 CENTER_PX = 1.5                 # "in the middle of the skull": this close (map px)
 ARRIVE_PX = 4.0                 # at a skull when this close (map px at the default zoom)
@@ -293,7 +293,7 @@ def read_map(frame, prev=None) -> HMap | None:
         return out
     skulls = comps(red)
     # standing on a skull, its white face and your arrow cut the red circle in two halves, each
-    # too small to count (Blayne 11-01 17:59: "no spots left" with 1/6 to go): close the gaps
+    # too small to count (11-01 17:59: "no spots left" with 1/6 to go): close the gaps
     # and take what that adds (only that: closing can also join a skull to red bits nearby)
     red_c = cv2.morphologyEx(red.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8)) & ins
     for q in comps(red_c):
@@ -321,7 +321,7 @@ def read_map(frame, prev=None) -> HMap | None:
         x, y, w, h, a = (int(v) for v in st[i])
         big, small = max(w, h) / sy, min(w, h) / sy
         # (pointing diagonally its box is ~12x12 - that was thrown out, and you were "lost" next
-        # to a skull: Blayne 11-01 18:06. The skulls' faces stay under 75 px, the arrow ~90)
+        # to a skull: 11-01 18:06. The skulls' faces stay under 75 px, the arrow ~90)
         if not (80 <= a / (sy * sy) <= 140 and 10 <= big <= 21 and 8 <= small <= 16):
             continue
         cands.append((float(cen[i][0]), float(cen[i][1])))
@@ -652,7 +652,7 @@ class HuecoRun:
             # ---- the spot being cleared (locked): it's done when the SPOTS counter goes down by
             # one (its group is dead), or its skull has turned into a grey check (no red left
             # there). NOT when the skull just can't be seen: standing on it, your arrow covers it
-            # (that made it walk off with enemies left, Blayne 11-01)
+            # (that made it walk off with enemies left, 11-01)
             lk = self.lock
             if lk is not None and self.wave is not None and lk["wave"] != self.wave:
                 self.lock = lk = None                 # next wave: back at spawn, new spots

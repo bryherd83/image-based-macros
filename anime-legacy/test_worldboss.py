@@ -1,4 +1,4 @@
-"""World boss (worldboss.py): the 'World Boss' bar is read on Blayne's screenshots, the trip waits
+"""World boss (worldboss.py): the 'World Boss' bar is read on the screenshots, the trip waits
 for the :00 dungeon, and the whole trip (teleport, walk, fight, back) runs on a fake game.
     python test_worldboss.py
 """

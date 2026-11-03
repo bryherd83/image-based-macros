@@ -12,7 +12,7 @@ sys.path.insert(0, HERE)
 import hud  # noqa: E402
 import hueco  # noqa: E402
 
-# ---------------- 1. readers on screenshots (Blayne 11-01) ----------------
+# ---------------- 1. readers on screenshots (11-01) ----------------
 SHOTS = os.path.join(HERE, "testdata", "hueco")
 WANT = {  # file: (in a run, wave, spots, (you x, y) or None, skulls)
     "s108.png": (True, 1, "4/4", (-1, -1), 4),
@@ -85,7 +85,7 @@ if os.path.isdir(SHOTS):
     f = cv2.imread(os.path.join(SHOTS, "hidden.jpg"))
     if f is not None:
         assert hueco.read_map(f).player is None
-        # your arrow out by the rim (walking round a skull at 91 px: lost at 94+, Blayne 11-01)
+        # your arrow out by the rim (walking round a skull at 91 px: lost at 94+, 11-01)
         c = hud.minimap_crop(f, hueco.MAP_R + hueco.ARROW_EXTRA)
         R = (c.shape[0] - 1) // 2
         hueco.find_arrow(c, R, 1.0)
@@ -313,7 +313,7 @@ vote = cv2.imread(os.path.join(HERE, "testdata", "hueco", "sealed-spots-vote.jpg
 assert hueco.pick_card(vote)[0] == 1 and hueco.pick_card(vote, (), avoid) == (2, "first card")
 vote = cv2.imread(os.path.join(HERE, "testdata", "hueco", "vote-time-pressure.jpg"))
 assert hueco.pick_card(vote, (), avoid) == (1, "risk & reward")
-# Leave matches its picture only 89% on Blayne's PC: it stayed on wave 11 (11-02 13:08). No such
+# Leave matches its picture only 89% on the laptop: it stayed on wave 11 (11-02 13:08). No such
 # button in the lobby
 tpl = hud.Templates()
 c = tpl.find(cv2.imread(os.path.join(HERE, "testdata", "hueco", "leave-89pct.jpg")), "leave", min_frac=0.8)

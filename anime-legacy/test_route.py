@@ -1,5 +1,5 @@
 """Routes: quickest by rooms + turns, and pressing Spawn when walking from the blue room is quicker
-(Blayne 10-19: from far away it walked the long way round).
+(10-19: from far away it walked the long way round).
     python test_route.py
 """
 import os, sys

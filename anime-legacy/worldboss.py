@@ -1,4 +1,4 @@
-"""World boss (top of every hour, Map 4 Sins Kingdom, up for 15 minutes; Blayne 10-21).
+"""World boss (top of every hour, Map 4 Sins Kingdom, up for 15 minutes; 10-21).
 
 After the :00 dungeon (or from wherever the farm idles), if the 'world_boss' setting is on:
 Worlds -> Teleport -> Sins Kingdom, walk straight from the landing spot (the boss is ahead, off to
@@ -144,7 +144,7 @@ class WorldBoss:
         return False
 
     def _off_mount(self):
-        """A dungeon leaves you on the mount; the walks were timed on foot (with sprint, Blayne
+        """A dungeon leaves you on the mount; the walks were timed on foot (with sprint,
         10-21). The next dungeon gets back on by itself."""
         e = self.env
         if getattr(e, "mount_on", None) is True and getattr(e, "toggle_mount", None):
@@ -224,7 +224,7 @@ class WorldBoss:
 
     def walk_to_goku(self):
         """Map 5: walk forward from the landing spot until you start hitting Goku Black (the DPS
-        meter goes above 0), then stand there (Blayne 10-21)."""
+        meter goes above 0), then stand there (10-21)."""
         e = self.env
         S = e.settings
         most = float(S.get("home_walk_sec", 3.2))   # (usually hits at 2.2-2.8 s; when Goku Black is dead it walked 10 s, past him: laptop 10-22)
@@ -256,7 +256,7 @@ class WorldBoss:
         plan = S.get("world_boss_walk", [["w", 6.0], ["wd", 6.0], ["w", 1.0]])
         # the plan was timed with sprint ON (test 21:19, "damn near perfect"): sprint goes on for
         # the walk (it's a toggle, pressed while moving) unless it's known to be on already, and
-        # back off once there, so trials still start without it (Blayne 10-21)
+        # back off once there, so trials still start without it (10-21)
         toggled = False
         tog = getattr(e, "toggle_sprint", None)
         if tog and getattr(e, "sprint_on", None) is not True:

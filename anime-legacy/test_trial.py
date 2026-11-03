@@ -256,7 +256,7 @@ if __name__ == "__main__":
     print("  before:", summary([run(old, "deep (like your 19:47 trial)", s, **kw) for s in range(n)]))
     print("  now:   ", summary([run(trial_new, "deep (like your 19:47 trial)", s, **kw) for s in range(n)]))
     # a unit that teleports to the enemies: all dead before the walk-in ends, same enemy count
-    # every room (13.4 s a room, Blayne 11-01)
+    # every room (13.4 s a room, 11-01)
     print("\nenemies dead on arrival: before → now")
     fast = [run(trial_new, "spread over the room", s, instant=True) for s in range(n)]
     print("  before:", summary([run(old, "spread over the room", s, instant=True) for s in range(n)]))

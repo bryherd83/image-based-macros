@@ -18,7 +18,8 @@ Farms Hueco Mundo runs over and over, and leaves after the wave you set (10 to s
 It does nothing else: no Dungeons, Trials or world boss.
 
 Setup
-1. Install Python 3.11 or newer from python.org. Tick "Add python.exe to PATH".
+1. Install Python. Download it here: https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe
+   Run it and tick "Add python.exe to PATH" on the first screen, then Install Now.
 2. Unzip this folder somewhere, for example your Documents.
 3. Run Roblox fullscreen at 1920x1080, standing in the lobby.
 4. Get on your mount. The macro never presses M.
