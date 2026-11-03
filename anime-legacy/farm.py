@@ -553,6 +553,8 @@ class Farm:
 class App:
     def __init__(self):
         self.S = load_settings()
+        if self.S.get("hueco_only"):
+            self.S.update(mode="hueco", join_trials=False, hueco_leave_for_popups=False, world_boss=False)
         self.root = tk.Tk()
         self.root.withdraw()
         self.q: queue.Queue = queue.Queue()
@@ -648,6 +650,7 @@ class App:
         w.resizable(False, False)
         w.protocol("WM_DELETE_WINDOW", w.withdraw)
         pad = {"padx": 12, "pady": 3, "sticky": "w"}
+        full = not self.S.get("hueco_only")        # the Hueco Mundo copy shows only its own row
         ttk.Label(w, text="What should the macro farm?").grid(row=0, column=0, columnspan=3, **pad)
         self.mode_var = tk.StringVar(value=self.S["mode"])
         for r, (val, txt) in enumerate((("culling", "Culling Game"),
@@ -657,29 +660,36 @@ class App:
                                         ("hueco", "Hueco Mundo (Soul Society's purple key), and leave after wave"),
                                         ("alt", "Alt: join Dungeons and Trials and stand still (leaves when they're done)")),
                                        start=1):
+            if not full and val != "hueco":
+                continue
             ttk.Radiobutton(w, text=txt, value=val, variable=self.mode_var, command=self._picked).grid(
                 row=r, column=0, columnspan=3, **pad)
         self.hm_leave_var = tk.StringVar(value=str(self.S.get("hueco_leave_after", 10)))
         ttk.Entry(w, textvariable=self.hm_leave_var, width=5).grid(row=5, column=2, padx=4, sticky="w")
         self.hm_leave_var.trace_add("write", lambda *a: self._picked())
         self.hm_pop_var = tk.BooleanVar(value=bool(self.S.get("hueco_leave_for_popups", True)))
-        ttk.Checkbutton(w, text="      Also join Dungeons, and leave Hueco Mundo for popups (off = no Dungeons)",
-                        variable=self.hm_pop_var, command=self._picked).grid(row=7, column=0, columnspan=3, **pad)
         self.trial_var = tk.BooleanVar(value=self.S["join_trials"])
-        ttk.Checkbutton(w, text="Also join Trials when they pop up, and leave after wave", variable=self.trial_var,
-                        command=self._picked).grid(row=8, column=0, columnspan=2, **pad)
         self.leave_var = tk.StringVar(value=str(self.S["trial_leave_after"]))
-        e = ttk.Entry(w, textvariable=self.leave_var, width=5)
-        e.grid(row=8, column=2, padx=4, sticky="w")
-        self.leave_var.trace_add("write", lambda *a: self._picked())
         self.mount_var = tk.BooleanVar(value=bool(self.S.get("ride_mount", True)))
-        ttk.Checkbutton(w, text="Ride the mount (M) in dungeons",
-                        variable=self.mount_var, command=self._picked).grid(row=9, column=0, columnspan=3, **pad)
         self.boss_var = tk.BooleanVar(value=bool(self.S.get("world_boss", False)))
-        ttk.Checkbutton(w, text="World boss at the top of every hour (Map 4), then back to Map 5",
-                        variable=self.boss_var, command=self._picked).grid(row=10, column=0, columnspan=3, **pad)
-        ttk.Button(w, text="Test the walk", command=lambda: (self._picked(), w.withdraw(), self.farm.test_boss_walk())
-                   ).grid(row=10, column=3, padx=4, sticky="w")
+        if full:
+            ttk.Checkbutton(w, text="      Also join Dungeons, and leave Hueco Mundo for popups (off = no Dungeons)",
+                            variable=self.hm_pop_var, command=self._picked).grid(row=7, column=0, columnspan=3, **pad)
+            ttk.Checkbutton(w, text="Also join Trials when they pop up, and leave after wave", variable=self.trial_var,
+                            command=self._picked).grid(row=8, column=0, columnspan=2, **pad)
+            e = ttk.Entry(w, textvariable=self.leave_var, width=5)
+            e.grid(row=8, column=2, padx=4, sticky="w")
+            self.leave_var.trace_add("write", lambda *a: self._picked())
+            ttk.Checkbutton(w, text="Ride the mount (M) in dungeons",
+                            variable=self.mount_var, command=self._picked).grid(row=9, column=0, columnspan=3, **pad)
+            ttk.Checkbutton(w, text="World boss at the top of every hour (Map 4), then back to Map 5",
+                            variable=self.boss_var, command=self._picked).grid(row=10, column=0, columnspan=3, **pad)
+            ttk.Button(w, text="Test the walk",
+                       command=lambda: (self._picked(), w.withdraw(), self.farm.test_boss_walk())
+                       ).grid(row=10, column=3, padx=4, sticky="w")
+        else:
+            ttk.Label(w, text="Get on your mount before you start: the macro doesn't touch it.").grid(
+                row=7, column=0, columnspan=3, **pad)
         ttk.Button(w, text="Start  (F6)", command=lambda: (self._picked(), w.withdraw(), self.farm.start())).grid(
             row=11, column=0, padx=12, pady=10, sticky="w")
         ttk.Label(w, text="F5 = open this window again", foreground="gray").grid(row=11, column=1, columnspan=2,

@@ -21,6 +21,7 @@ AHK_INI = os.path.expandvars(r"%USERPROFILE%\Downloads\anime-legacy-settings.ini
 
 DEFAULTS = {
     "mode": "dungeon",                 # culling | dungeon | both | defense | hueco | alt
+    "hueco_only": False,               # the copy for guild mates (make_hueco_zip.py): Hueco Mundo and nothing else
     "alt_dungeon_max_sec": 900,        # alt: press Leave if a dungeon is still going after this long
     "join_trials": True,
     "trial_leave_after": 27,
