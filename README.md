@@ -35,10 +35,18 @@ Each folder is its own project with its own README.
 ## Requirements
 
 - Windows 10 or 11
-- [Python 3.11+](https://www.python.org/downloads/). Tick "Add python.exe to PATH" while installing.
+- Python: **[download Python 3.12 for Windows](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe)** (or any 3.11+ from
+  [python.org](https://www.python.org/downloads/)). Tick "Add python.exe to PATH" on the first screen.
 - The game running fullscreen, 1920×1080 recommended
 
 Each project has a `run.bat` that sets everything up the first time you run it.
+
+## Hueco Mundo only (Anime Legacy)
+
+A ready-made copy that farms Hueco Mundo and nothing else:
+**[download anime-legacy-hueco.zip](https://github.com/bryherd83/image-based-macros/releases/download/hueco-2026-11-03/anime-legacy-hueco.zip)**.
+Install Python (above), unzip it, get on your mount in game and double-click `run.bat`. Its
+`README.txt` has the rest.
 
 ## Quick start
 
