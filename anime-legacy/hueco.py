@@ -782,7 +782,7 @@ class HuecoRun:
                     dist(best, m.spawn) + SPAWN_COST_SEC * spd < d and S.get("hueco_spawn_shortcut", True):
                 self.doing = "Spawn"
                 self.stop()
-                if e.press_spawn(wait=1.2):
+                if self.press_spawn():
                     self.last_spawn = e.now()
                     e.log("Hueco Mundo: pressed Spawn · the next spot is quicker from there")
                     self.prev = None
@@ -796,6 +796,15 @@ class HuecoRun:
                 lk["arrived"] = now
                 self.at_target_since = now
                 self.stucks, self.tap_ref = 0, None
+            if lk["arrived"] is None and now - lk["t"] > REACH_SEC and not lk.get("respawned") and \
+                    now - self.last_spawn > 5 and self.press_spawn():
+                # every one of 19 was from the same place, 12 px across a wall from the skull (11-02
+                # 14:47-23:20): from Spawn the way there is another one
+                self.last_spawn = e.now()
+                lk["respawned"], lk["t"] = True, e.now()
+                e.log(f"Hueco Mundo: couldn't reach the spot in {REACH_SEC}s ({d:.1f}px off) · from Spawn again")
+                self.prev = None
+                continue
             if lk["arrived"] is None and now - lk["t"] > REACH_SEC:
                 # standing 12 px off a skull with 3 other spots left until the wave ran out, and the
                 # run was lost (11-02 14:25:34). The timer below only starts once you're there
@@ -867,6 +876,20 @@ class HuecoRun:
         a = want + (-1 if left else 1) * (0.75 if back else 0.25) * math.pi
         return keys_for(math.cos(a), math.sin(a), arrow) or {"w"}
 
+    def press_spawn(self):
+        """Spawn, also when its button matches its picture only 87% (needs 97%): on that PC no
+        "stuck · press Spawn" got through, 11-02 14:47-23:20."""
+        e = self.env
+        if e.press_spawn(wait=1.2):
+            return True
+        c = e.find("spawn", min_frac=0.8)
+        if not c:
+            return False
+        e.release_all()
+        e.click(*c)
+        e.sleep(1.2)
+        return True
+
     def stuck_spawn(self, now):
         """Each shuffle sideways reset the old count, so Spawn never came: 52 s of a 2:30 wave lost
         on a rock (11-02 12:16:30). True if it pressed Spawn."""
@@ -875,7 +898,7 @@ class HuecoRun:
         if self.stuck_tries < 8 or now - self.last_spawn <= 20:
             return False
         self.stop()                     # (press_spawn lets go of the keys: W must be pressed again)
-        if not e.press_spawn(wait=1.2):
+        if not self.press_spawn():
             return False
         e.log("Hueco Mundo: stuck · pressed Spawn")
         self.last_spawn = e.now()

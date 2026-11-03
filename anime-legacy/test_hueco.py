@@ -366,6 +366,7 @@ try:
     raise AssertionError("never got to the other spot")
 except Reached:
     assert w.skulls[0][0] == 130.0 and any("couldn't reach the spot" in m for m in env.logs), env.logs[-5:]
+    assert any("from Spawn again" in m for m in env.logs), env.logs[-8:]   # first a try from Spawn
 # on the mount (you get on before the run): it stays on (M got you off it, 11-02 13:19:12)
 w = World(9, mounted=True)
 env = Env(w)
