@@ -560,6 +560,7 @@ class HuecoRun:
         S = self.S
         leave_for_popups = bool(S.get("hueco_leave_for_popups", True))
         misses = 0
+        last_run_f = None
         last_house = last_pop = 0.0
         e.log(f"Hueco Mundo started · leaving after wave {self.leave_after}")
         e.shot("hueco-started", force=True)
@@ -602,10 +603,16 @@ class HuecoRun:
                 if misses >= 20:
                     e.log(f"Hueco Mundo: run over (wave {self.wave})")
                     e.shot("hueco-finished", force=True)
+                    # the last picture still in the run: why it ended (another account's runs all
+                    # ended at wave 2, and "finished" only showed the loading screen, 11-04 17:32-17:45)
+                    lg = getattr(e, "logger", None)
+                    if lg is not None and last_run_f is not None:
+                        lg.shot(last_run_f, "hueco-before-end", True)
                     return "done"
                 e.sleep(0.25)
                 continue
             misses = 0
+            last_run_f = f
             # ---- popups: join a Dungeon / Trial popup (leaves this run) if set so
             if leave_for_popups and now - last_pop > 2.0:
                 last_pop = now

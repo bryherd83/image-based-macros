@@ -201,6 +201,9 @@ class Culling:
                     self.nav_clicks[name] = n
                     if n > 3:                      # clicking it does nothing: close up, try later
                         self.last_nav = 0
+                        # (with a picture: another account stayed on the Create screen, 11-04 17:46)
+                        e.log(f"{what}: clicked {name} 3 times and nothing happened · screenshot saved")
+                        e.shot(f"{prefix}-{name}-no-effect", force=True)
                         x = e.find("close", f)
                         if x:
                             e.close_menu(*x)
