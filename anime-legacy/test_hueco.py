@@ -306,6 +306,16 @@ assert not hueco.in_run(f, c, None)
 f = cv2.imread(os.path.join(HERE, "testdata", "hueco", "run-ended-lobby.jpg"))
 assert not hueco.in_run(f, hud.castle_x(f), 8)
 print("still in the run: ok")
+# Create matches its picture only 87% on other PCs: it never got past the Create screen (11-04 17:24)
+# (the Create screen, drawn softer and brighter the way another PC shows it: about 90%)
+f = cv2.imread(os.path.join(HERE, "testdata", "hueco", "s105.png"))
+f = cv2.convertScaleAbs(cv2.resize(cv2.resize(f, None, fx=.5, fy=.5, interpolation=cv2.INTER_AREA), (1920, 1080),
+                                   interpolation=cv2.INTER_CUBIC), alpha=1.0, beta=30)
+t = hud.Templates()
+c = t.find(f, "create", min_frac=0.8)
+assert t.find(f, "create") is None and c and abs(c[0] - 542) < 6 and abs(c[1] - 649) < 6, c
+assert t.find(f, "play", min_frac=0.8) is None
+
 # Sealed Spots hides every skull for the rest of the run and it's red, so it got picked (11-02
 # 14:30:35): now the next best card. Other red cards still count
 avoid = hueco.card_pictures(pattern="hmavoid_*.png")

@@ -193,7 +193,9 @@ class Culling:
             return                                # a popup is up: it gets joined, not Defense
         if not just_started and navigating:
             for name, msg in (("play", "pressed Play"), ("create", "pressed Create"), (icon, f"opened {what}")):
-                c = e.find(name, f)
+                # (other PCs draw these buttons a little differently: Create matched its picture
+                # only 87%, needs 97%, and it never got past the Create screen, 11-04 17:24)
+                c = e.find(name, f, min_frac=0.8)
                 if c:
                     n = self.nav_clicks.get(name, 0) + 1
                     self.nav_clicks[name] = n
