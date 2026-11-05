@@ -191,7 +191,11 @@ class Culling:
         pop = popup() if navigating and popup else None
         if pop is not None and pop.kind in kinds:
             return                                # a popup is up: it gets joined, not Defense
-        if not just_started and navigating:
+        # Hueco Mundo's Create screen up later than 15 s after the key: press Create, not close it as
+        # a menu we didn't open (another account's opened slower: closed and reopened over and over,
+        # 11-04 17:45-17:56). Play then follows as usual. Not with a popup due soon
+        menu_up = prefix == "hueco" and not navigating and not just_started and             due_in >= float(S.get(f"{prefix}_not_before_popup_sec", 300)) and             e.find("create", f, min_frac=0.8) is not None
+        if not just_started and (navigating or menu_up):
             for name, msg in (("play", "pressed Play"), ("create", "pressed Create"), (icon, f"opened {what}")):
                 # (other PCs draw these buttons a little differently: Create matched its picture
                 # only 87%, needs 97%, and it never got past the Create screen, 11-04 17:24)

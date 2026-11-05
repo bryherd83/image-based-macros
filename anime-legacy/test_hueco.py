@@ -315,6 +315,24 @@ t = hud.Templates()
 c = t.find(f, "create", min_frac=0.8)
 assert t.find(f, "create") is None and c and abs(c[0] - 542) < 6 and abs(c[1] - 649) < 6, c
 assert t.find(f, "play", min_frac=0.8) is None
+# the Create screen came up more than 15 s after the key: it was closed as "a menu we didn't
+# open" and opened again, over and over (another account, 11-04 17:45-17:56). Now Create is pressed
+import types  # noqa: E402
+import culling  # noqa: E402
+f = cv2.imread(os.path.join(HERE, "testdata", "hueco", "create-late.jpg"))
+clicks, closed = [], []
+env = types.SimpleNamespace(settings={"mode": "hueco", "hueco_leave_for_popups": False, "join_trials": False},
+                            now=lambda: 500.0, find=lambda n, fr=None, **k: t.find(f if fr is None else fr, n, **k),
+                            click=lambda x, y, **k: clicks.append((x, y)), log=print, status=lambda m: None,
+                            shot=lambda *a, **k: None, popup=lambda: None, info={}, release_all=lambda: None,
+                            close_menu=lambda x, y: closed.append((x, y)))
+cu = culling.Culling.__new__(culling.Culling)
+cu.env = env
+cu.last_start = cu.last_nav = cu.def_fails = cu.last_open_try = cu.last_in_run = cu.hold_until = 0
+cu.nav_clicks = {}
+cu.hueco_tick(f)
+assert clicks and abs(clicks[0][0] - 542) < 6 and not closed, (clicks, closed)
+
 
 # Sealed Spots hides every skull for the rest of the run and it's red, so it got picked (11-02
 # 14:30:35): now the next best card. Other red cards still count
