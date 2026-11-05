@@ -313,8 +313,18 @@ f = cv2.convertScaleAbs(cv2.resize(cv2.resize(f, None, fx=.5, fy=.5, interpolati
                                    interpolation=cv2.INTER_CUBIC), alpha=1.0, beta=30)
 t = hud.Templates()
 c = t.find(f, "create", min_frac=0.8)
-assert t.find(f, "create") is None and c and abs(c[0] - 542) < 6 and abs(c[1] - 649) < 6, c
+assert t.find(f, "create", min_frac=0.97) is None and t.find(f, "create") == c and c and abs(c[0] - 542) < 6 and abs(c[1] - 649) < 6, c
 assert t.find(f, "play", min_frac=0.8) is None
+# Spawn the same: softer on another PC, so a trial never pressed it and stood still (11-04)
+import game  # noqa: E402
+f = cv2.imread(os.path.join(HERE, "testdata", "screens", "1013-200142-Joining-the-dungeon.jpg"))
+f = cv2.convertScaleAbs(cv2.resize(cv2.resize(f, None, fx=.5, fy=.5, interpolation=cv2.INTER_AREA), (1920, 1080),
+                                   interpolation=cv2.INTER_CUBIC), alpha=1.0, beta=30)
+sp = []
+g = __import__("types").SimpleNamespace(frame=lambda: f, find=lambda n, fr=None, **k: t.find(fr, n, **k),
+                                                 release_all=lambda: None, click=lambda x, y: sp.append((x, y)),
+                                                 sleep=lambda s: None)
+assert t.find(f, "spawn", min_frac=0.97) is None and game.Game.press_spawn(g, wait=0) and sp == [(1080, 122)], sp
 # the Create screen came up more than 15 s after the key: it was closed as "a menu we didn't
 # open" and opened again, over and over (another account, 11-04 17:45-17:56). Now Create is pressed
 import types  # noqa: E402
@@ -404,6 +414,11 @@ assert run.speed < 110, run.speed             # (80 here. A walk counted as a ta
 # walks without turning the camera: no drags at all (131 s of a 7.7 min run, 11-02 13:24:50)
 assert w.drags == 0 and "Hueco time: " in " ".join(env.logs), (w.drags, env.logs[-3:])
 assert "turning" not in " ".join(env.logs)
+# a Trial took you off the mount (mount_on False): back on once at the start, then left alone (11-04)
+w = World(9, mounted=False)
+env = Env(w)
+env.mount_on = False
+assert hueco.HuecoRun(env).run() == "left" and env.presses == 1 and w.mounted, (env.presses, w.mounted)
 # shuffling a little after each jump still counts toward pressing Spawn (11-02 12:16:30: 52 s)
 w = World(12)
 run = hueco.HuecoRun(Env(w))

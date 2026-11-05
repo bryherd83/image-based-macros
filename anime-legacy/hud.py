@@ -60,6 +60,12 @@ REGIONS = {
     "hmcards": ((0.25, 0.05, 0.75, 0.30), 70),
 }
 
+# Buttons other PCs draw softer: they match only ~87-89% there (guild mates' Leave, Spawn and Create
+# were never pressed, 11-04). Wrong spots scored at most 0.82 on the 971 test pictures. Left at 0.97:
+# dice, key, dungeonpop, dropsx and close, whose wrong spots reach 0.87-0.94
+LOOSE = dict.fromkeys(("worlds", "worlds2", "sinskingdom", "dragoncity", "create", "play", "close2", "leave",
+                       "leave_old", "spawn", "spawn_old", "trialpop", "hmkey", "joinevent"), 0.85)
+
 
 class Templates:
     def __init__(self, folder: str = ASSETS):
@@ -70,8 +76,10 @@ class Templates:
             if im is not None:
                 self.img[name] = im
 
-    def find(self, frame: np.ndarray, name: str, region=None, tol=None, min_frac=0.97):
+    def find(self, frame: np.ndarray, name: str, region=None, tol=None, min_frac=None):
         """Centre (x, y) of the picture inside frame, or None."""
+        if min_frac is None:
+            min_frac = LOOSE.get(name, 0.97)
         frac, c = self.match(frame, name, region, tol)
         alt = {"close": "close2", "worlds": "worlds2", "roomhud": "roomhud_old", "leave": "leave_old",
                "spawn": "spawn_old", "defheart": "defheart_old"}.get(name)

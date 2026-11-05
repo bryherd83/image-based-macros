@@ -564,6 +564,11 @@ class HuecoRun:
         last_house = last_pop = 0.0
         e.log(f"Hueco Mundo started · leaving after wave {self.leave_after}")
         e.shot("hueco-started", force=True)
+        # a Trial (or a Dungeon with riding off) took you off the mount, and Hueco never presses M
+        # otherwise: back on once. Only when known to be off (None = never touched: leave it, 11-04)
+        if getattr(e, "mount_on", None) is False and hasattr(e, "toggle_mount"):
+            e.toggle_mount("back on the mount for Hueco Mundo")
+            e.sleep(0.3)
         while True:
             if not e.running():
                 self.stop()

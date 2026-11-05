@@ -436,7 +436,10 @@ class Game:
         time.sleep(0.03)
 
     def press_spawn(self, wait=1.0):
-        c = self.find("spawn")
+        f = self.frame()
+        # other PCs match Spawn only ~87% (as Leave and Create): it was never pressed, so its
+        # spot was never learned either (another player's trial stood still, 11-04)
+        c = self.find("spawn", f) or self.find("spawn", f, min_frac=0.8)
         if not c:
             return False
         self.spawn_xy = c                 # the button doesn't move: remembered for spawn_spot()

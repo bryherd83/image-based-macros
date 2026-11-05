@@ -357,7 +357,7 @@ def run_trial(env, mode, leave_after):
             # Spawn retries in wave 21 until the dungeon popup came): leave with what's been won
             give_up = float(S.get("trial_give_up_sec", 180))
             if give_up > 0 and now - unreached_since > give_up:
-                c = env.find("leave", f)
+                c = env.find("leave", f, min_frac=0.8)   # other PCs: ~87% (11-04)
                 if c:
                     env.release_all()
                     env.log(f"trial: couldn't reach the enemies in wave {wv_t} for {now - unreached_since:.0f}s"
@@ -463,7 +463,7 @@ def run_trial(env, mode, leave_after):
                 env.shot("trial-frozen", force=True)
                 break
             if wv and wv.a >= leave_after:
-                c = env.find("leave", f)
+                c = env.find("leave", f, min_frac=0.8)   # other PCs: ~87% (11-04)
                 if c:
                     env.click(*c)
                     env.status(f"trial: wave {wv.a} done · leaving")
