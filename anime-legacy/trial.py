@@ -191,6 +191,10 @@ def sprint_off_for_trial(env, S):
         if toggle_m:
             toggle_m("trials walk without the mount")
             env.sleep(0.3)
+    if hasattr(env, "mount_on"):
+        # off the mount after a trial either way (the game too: M never pressed, yet off in Hueco
+        # after it, 11-05 00:18): Hueco gets back on
+        env.mount_on = False
     if S.get("trial_sprint", False):
         return
     on = getattr(env, "sprint_on", None)

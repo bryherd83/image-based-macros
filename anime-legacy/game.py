@@ -465,7 +465,7 @@ class Game:
         if f is None:
             return "no picture from the screen"
         frac, c = self.tpl.match(f, "spawn")
-        return f"best match {frac:.0%} at {c} (needs 97%), screen {f.shape[1]}x{f.shape[0]}"
+        return f"best match {frac:.0%} at {c} (needs 85%), screen {f.shape[1]}x{f.shape[0]}"
 
     def wait_moved(self, before, most=2.5, least=0.2):
         """After Spawn: waits until the middle of the screen has changed from `before` (you were

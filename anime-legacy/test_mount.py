@@ -48,7 +48,7 @@ class TrialEnv:
 for on, want in ((True, 1), (False, 0), (None, 0)):
     t = TrialEnv(on)
     trial.sprint_off_for_trial(t, {})
-    assert len(t.presses) == want and (on is not True or t.mount_on is False), (on, t.presses)
+    assert len(t.presses) == want and t.mount_on is False, (on, t.presses, t.mount_on)   # (Hueco gets back on)
 # riding switched off in F5 but still mounted: it gets off once and stays off
 for seed in (1, 2):
     env = sim.SimEnv(seed=seed, mount=2.4, mounted=True)
